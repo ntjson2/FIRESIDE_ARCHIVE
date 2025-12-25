@@ -13,7 +13,20 @@ export interface Tag {
   distance: number; // 1-10
 }
 
+export interface TagEntity extends BaseEntity {
+  name: string;
+  count: number;
+  mediaIds?: string[];
+}
+
+export interface FiresideFamily extends BaseEntity {
+  uid: string;
+  name: string;
+  description: string;
+}
+
 export interface Fireside extends BaseEntity {
+  firesideFamilyId: string;
   name: string;
   description: string;
   date: Timestamp;
@@ -33,12 +46,23 @@ export interface Deepening extends BaseEntity {
   name: string;
   text: string; // Markdown
   tags: Tag[];
+  mediaIds?: string[];
 }
 
 export interface SupportingMaterial extends BaseEntity {
-  sourceId: string;
+  sourceIds: string[]; // unique IDs
   sourceType: 'snippet' | 'deepening';
   text: string;
+  mediaIds?: string[];
+}
+
+export interface Media extends BaseEntity {
+  name: string;
+  description: string;
+  ipfsLink: string;
+  size: number; // in bytes
+  type: string; // MIME type e.g. "image/jpeg"
+  dimensions?: string; // e.g. "1920x1080"
 }
 
 export interface Comment extends BaseEntity {
@@ -46,11 +70,12 @@ export interface Comment extends BaseEntity {
   sourceType: 'snippet' | 'deepening';
   userId: string;
   text: string;
+  mediaIds?: string[];
 }
 
 export interface OutlineItem {
   itemId: string;
-  type: 'snippet' | 'deepening';
+  type: 'snippet' | 'deepening' | 'media';
   refId: string;
   isVisible: boolean;
   children?: OutlineItem[];

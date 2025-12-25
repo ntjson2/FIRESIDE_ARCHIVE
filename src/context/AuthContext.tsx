@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (firebaseUser) {
         // Fetch user profile from Firestore
         try {
-          const docRef = doc(db, 'users', firebaseUser.uid);
+          const docRef = doc(db, 'user', firebaseUser.uid);
           const docSnap = await getDoc(docRef);
 
           if (docSnap.exists()) {

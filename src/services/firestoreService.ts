@@ -73,7 +73,10 @@ export class FirestoreService<T extends BaseEntity> {
 }
 
 // Export instances for specific collections
-export const firesideService = new FirestoreService<any>('firesides');
-export const snippetService = new FirestoreService<any>('snippets');
-export const deepeningService = new FirestoreService<any>('deepenings');
-export const outlineService = new FirestoreService<any>('outlines');
+export const firesideFamilyService = new FirestoreService<any>('firesideFamily');
+export const firesideService = new FirestoreService<any>('fireside');
+export const snippetService = new FirestoreService<any>('snippet');
+export const deepeningService = new FirestoreService<any>('deepening');
+export const supportingMaterialService = new FirestoreService<any>('supportingMaterial');
+export const mediaService = new FirestoreService<any>('media');
+export const outlineService = new FirestoreService<any>('outline');

@@ -44,57 +44,82 @@ A prototype website to store, manage, and compile snippets and deepenings from B
 
 ## 5. Data Model (Firestore Schema)
 
-### `users` Collection
+### `user` Collection
 - `uid` (string): Firebase Auth ID
 - `email` (string)
 - `displayName` (string)
 - `role` (string): "SuperAdmin" | "Admin" | "Participant" | "Guest"
 - `createdAt` (timestamp)
 
-### `firesides` Collection
+### `firesideFamily` Collection
+- `uid` (string): Unique ID
+- `name` (string): e.g., "General Firesides"
+- `description` (string)
+
+### `fireside` Collection
 - `id` (string): Auto-generated
+- `firesideFamilyId` (string): Reference to `firesideFamily` doc
 - `name` (string): e.g., "Why Life"
 - `description` (string)
 - `date` (timestamp)
 
-### `snippets` Collection
+### `snippet` Collection
 - `id` (string): Auto-generated
-- `firesideId` (string): Reference to `firesides` doc
+- `firesideId` (string): Reference to `fireside` doc
 - `name` (string): Short name
 - `text` (string): **Markdown content**
 - `naturalOrder` (number): e.g., 2.30
 - `tags` (array of objects): `[{ tagId, name, weight, distance }]`
 - `visibility` (string): "public" | "private"
 
-### `deepenings` Collection
+### `deepening` Collection
 - `id` (string): Auto-generated
-- `snippetId` (string): Reference to parent `snippets` doc
+- `snippetId` (string): Reference to parent `snippet` doc
 - `name` (string)
 - `text` (string): **Markdown content**
 - `tags` (array of objects)
+- `mediaIds` (array of strings): Optional references to `media` docs
 
-### `supportingMaterials` Collection
+### `supportingMaterial` Collection
 - `id` (string): Auto-generated
-- `sourceId` (string): ID of the Snippet or Deepening
+- `sourceIds` (array of strings): IDs of the Snippets or Deepenings (unique)
 - `sourceType` (string): "snippet" | "deepening"
 - `text` (string): Reference text
+- `mediaIds` (array of strings): Optional references to `media` docs
 
-### `comments` Collection
+### `comment` Collection
 - `id` (string): Auto-generated
 - `sourceId` (string): ID of the Snippet or Deepening
 - `sourceType` (string): "snippet" | "deepening"
 - `userId` (string)
 - `text` (string)
+- `mediaIds` (array of strings): Optional references to `media` docs
 
-### `outlines` Collection
+### `tag` Collection (Global Tag Registry)
+- `id` (string): Auto-generated
+- `name` (string): e.g., "Shilo"
+- `count` (number): Usage frequency
+- `mediaIds` (array of strings): Optional references to `media` docs
+
+### `outline` Collection
 - `id` (string): Auto-generated
 - `userId` (string)
 - `title` (string)
 - `items` (array of objects - JSON):
-  - Structure: `[{ itemId: "uuid", type: "snippet"|"deepening", refId: "db_id", isVisible: boolean, children: [] }]`
+  - Structure: `[{ itemId: "uuid", type: "snippet"|"deepening"|"media", refId: "db_id", isVisible: boolean, children: [] }]`
 - `markdown` (string): Cached compiled markdown of the outline (optional)
 
-### `auditLogs` Collection
+### `media` Collection
+- `id` (string): Auto-generated
+- `name` (string)
+- `description` (string)
+- `ipfsLink` (string): IPFS CID or gateway URL
+- `size` (number): Size in bytes
+- `type` (string): MIME type
+- `dimensions` (string): Optional, e.g., "1920x1080"
+- `createdAt` (timestamp)
+
+### `auditLog` Collection
 - `id` (string)
 - `userId` (string)
 - `action` (string): "CREATE", "UPDATE", "DELETE"

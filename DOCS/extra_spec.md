@@ -83,10 +83,43 @@ Primary goals:
 
 ## 5. Data Model (Firestore)
 
-### Snippets Collection
+### User Collection
 
 ```json
-snippets/{snippetId} {
+user/{userId} {
+  name: string,
+  email: string,
+  role: "user" | "admin",
+  createdAt: timestamp
+}
+```
+
+### Fireside Family Collection
+
+```json
+firesideFamily/{familyId} {
+  uid: string,
+  name: string,
+  description: string
+}
+```
+
+### Fireside Collection
+
+```json
+fireside/{firesideId} {
+  firesideFamilyId: string,
+  name: string,
+  description: string,
+  date: timestamp
+}
+```
+
+### Snippet Collection
+
+```json
+snippet/{snippetId} {
+  firesideId: string,
   markdown: string,
   title: string,
   tags: string[],
@@ -98,10 +131,10 @@ snippets/{snippetId} {
 }
 ```
 
-### Outlines Collection
+### Outline Collection
 
 ```json
-outlines/{outlineId} {
+outline/{outlineId} {
   userId: string,
   title: string,
   markdown: string,
@@ -111,14 +144,62 @@ outlines/{outlineId} {
 }
 ```
 
-### Users Collection
+### Media Collection
 
 ```json
-users/{userId} {
+media/{mediaId} {
   name: string,
-  email: string,
-  role: "user" | "admin",
+  description: string,
+  ipfsLink: string,
+  size: number,
+  type: string,
+  dimensions: string,
   createdAt: timestamp
+}
+```
+
+### Deepening Collection
+
+```json
+deepening/{deepeningId} {
+  snippetId: string,
+  name: string,
+  text: string,
+  tags: string[],
+  mediaIds: string[]
+}
+```
+
+### Supporting Material Collection
+
+```json
+supportingMaterial/{materialId} {
+  sourceIds: string[],
+  sourceType: "snippet" | "deepening",
+  text: string,
+  mediaIds: string[]
+}
+```
+
+### Comment Collection
+
+```json
+comment/{commentId} {
+  sourceId: string,
+  sourceType: "snippet" | "deepening",
+  userId: string,
+  text: string,
+  mediaIds: string[]
+}
+```
+
+### Tag Collection
+
+```json
+tag/{tagId} {
+  name: string,
+  count: number,
+  mediaIds: string[]
 }
 ```
 

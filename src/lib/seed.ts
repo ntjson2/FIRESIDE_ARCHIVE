@@ -1,18 +1,27 @@
-import { firesideService, snippetService } from "@/services/firestoreService";
+import { firesideFamilyService, firesideService, snippetService } from "@/services/firestoreService";
 import { Timestamp } from "firebase/firestore";
 
 export const seedData = async () => {
   console.log("Starting seed...");
 
-  // 1. Create a Fireside
+  // 1. Create a Fireside Family
+  const firesideFamily = await firesideFamilyService.create({
+    uid: "seed-uid-1",
+    name: "General Firesides",
+    description: "A collection of general introductory firesides."
+  });
+  console.log("Created Fireside Family:", firesideFamily.id);
+
+  // 2. Create a Fireside
   const fireside = await firesideService.create({
+    firesideFamilyId: firesideFamily.id,
     name: "Why Life?",
     description: "The purpose of life and the study of the spiritual evolution of mankind",
     date: Timestamp.now(),
   });
   console.log("Created Fireside:", fireside.id);
 
-  // 2. Create Snippets for that Fireside
+  // 3. Create Snippets for that Fireside
   const snippets = [
     {
       firesideId: fireside.id,

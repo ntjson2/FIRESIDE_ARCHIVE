@@ -20,7 +20,7 @@ A prototype website to store, manage, and compile snippets and deepenings from B
 
 ## 4. Data Model (Firestore Schema)
 
-### `users` Collection
+### `user` Collection
 - `uid` (string): Firebase Auth ID
 - `email` (string)
 - `displayName` (string)
@@ -28,65 +28,85 @@ A prototype website to store, manage, and compile snippets and deepenings from B
 - `createdAt` (timestamp)
 - `lastLogin` (timestamp)
 
-### `firesides` Collection
+### `firesideFamily` Collection
+- `uid` (string): Unique ID
+- `name` (string): e.g., "General Firesides"
+- `description` (string)
+
+### `fireside` Collection
 - `id` (string): Auto-generated
+- `firesideFamilyId` (string): Reference to `firesideFamily` doc
 - `name` (string): e.g., "Why Life"
 - `description` (string): e.g., "The purpose of life..."
 - `date` (timestamp)
 - `createdAt` (timestamp)
 
-### `snippets` Collection
+### `snippet` Collection
 - `id` (string): Auto-generated
-- `firesideId` (string): Reference to `firesides` doc
+- `firesideId` (string): Reference to `fireside` doc
 - `name` (string): Short name (up to 72 words)
 - `text` (string): Main content
 - `naturalOrder` (number): e.g., 2.30 (Rank in original fireside)
 - `tags` (array of objects): 
   - `[{ tagId: string, name: string, weight: number (1-100), distance: number (1-10) }]`
 
-### `deepenings` Collection
+### `deepening` Collection
 - `id` (string): Auto-generated
-- `snippetId` (string): Reference to parent `snippets` doc
+- `snippetId` (string): Reference to parent `snippet` doc
 - `name` (string)
 - `text` (string): Extended research text
 - `tags` (array of objects): Same structure as Snippets
+- `mediaIds` (array of strings): Optional references to `media` docs
 
-### `supportingMaterials` Collection
+### `supportingMaterial` Collection
 - `id` (string): Auto-generated
-- `sourceId` (string): ID of the Snippet or Deepening
+- `sourceIds` (array of strings): IDs of the Snippets or Deepenings (unique)
 - `sourceType` (string): "snippet" | "deepening"
 - `text` (string): Reference text
+- `mediaIds` (array of strings): Optional references to `media` docs
 
-### `comments` Collection
+### `comment` Collection
 - `id` (string): Auto-generated
 - `sourceId` (string): ID of the Snippet or Deepening
 - `sourceType` (string): "snippet" | "deepening"
 - `userId` (string): Author
 - `text` (string)
 - `createdAt` (timestamp)
+- `mediaIds` (array of strings): Optional references to `media` docs
 
-### `tags` Collection (Global Tag Registry)
+### `tag` Collection (Global Tag Registry)
 - `id` (string): Auto-generated
 - `name` (string): e.g., "Shilo"
 - `count` (number): Usage frequency
+- `mediaIds` (array of strings): Optional references to `media` docs
 
-### `outlines` Collection
+### `outline` Collection
 - `id` (string): Auto-generated
 - `userId` (string): Owner
 - `title` (string)
 - `isPublic` (boolean)
 - `items` (array of objects - JSON):
   - Stores the structure and order of the outline.
-  - Structure: `[{ itemId: "uuid", type: "snippet"|"deepening", refId: "db_id", isVisible: boolean, children: [] }]`
+  - Structure: `[{ itemId: "uuid", type: "snippet"|"deepening"|"media", refId: "db_id", isVisible: boolean, children: [] }]`
 - `createdAt` (timestamp)
 - `updatedAt` (timestamp)
 
-### `auditLogs` Collection
+### `media` Collection
+- `id` (string): Auto-generated
+- `name` (string)
+- `description` (string)
+- `ipfsLink` (string): IPFS CID or gateway URL
+- `size` (number): Size in bytes
+- `type` (string): MIME type
+- `dimensions` (string): Optional, e.g., "1920x1080"
+- `createdAt` (timestamp)
+
+### `auditLog` Collection
 - `id` (string): Auto-generated
 - `userId` (string): Who performed the action
 - `userName` (string): Cached display name
 - `action` (string): "CREATE", "UPDATE", "DELETE"
-- `targetCollection` (string): e.g., "snippets"
+- `targetCollection` (string): e.g., "snippet"
 - `targetId` (string)
 - `summary` (string): e.g., "Joe B. updated Snippet X"
 - `timestamp` (timestamp)

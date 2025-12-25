@@ -19,7 +19,7 @@ export const authService = {
       await updateProfile(user, { displayName });
 
       // Create user document in Firestore
-      await setDoc(doc(db, "users", user.uid), {
+      await setDoc(doc(db, "user", user.uid), {
         uid: user.uid,
         email: user.email,
         displayName: displayName,
@@ -39,7 +39,7 @@ export const authService = {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       // Update last login
-      await setDoc(doc(db, "users", userCredential.user.uid), {
+      await setDoc(doc(db, "user", userCredential.user.uid), {
         lastLogin: serverTimestamp()
       }, { merge: true });
       
