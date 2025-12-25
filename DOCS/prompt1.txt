@@ -1,0 +1,75 @@
+I am developing a prototype website with nextjs, firebase, firestore, tailwind and gemini pro api, that stores snippets and deepenings of data from BUPC firesides. These snippets have many parameters and relational tables. Each snippet has a related Fireside, supportingMaterial, snippetComment, deepening, tag tables references. 
+I want the users: SuperAdmin, Admin, Participant, Guest
+Give suggestions
+
+Tables: 
+Fireside: 
+	Fields - 
+		FiresideID - 
+		FiresideName - e.g.: Why life
+		FiresideDesc - e.g.: The purpose of life and the study of the spiritual evolution of mankind
+		
+Snippet:
+	Fields - 
+		SnippetID - Auto Inc.
+		SnippetName - short name (up to 72 words)
+		SnippetText - main text for snippet
+		naturalOrder -  number with up to two decimals "eg 2.30" which gives the the rank found in the original fireside
+	
+SupportingMaterial:
+	Fields -
+		SupID - Auto Inc.
+		SourceID - Foreign key -> Snippet.SnippetID or Deepening.DeepID
+		SupText - main reference text for snippet
+		SourceType - Snippet or Deepening (1 or 2)
+		
+Comment:
+	Fields -
+		CommentID - Auto Inc.
+		SourceID - Foreign key -> Snippet.SnippetID or Deepening.DeepID
+		CommentText - main comment text for snippet
+		SourceType - Snippet or Deepening(1 or 2)
+		
+Deepening: (This table is has extended research on a related snippet subject)
+	Fields -
+		DeepID - Auto Inc.
+		DeepeningName - short name
+		SnippetID - Foreign key -> Snippet.SnippetID
+		DeepSnippetText - main text for deepening
+		
+Tag:
+	Fields - help me with this.. This will be a bridge table referencing any of the above tables. 
+	e.g. type: (1:snippet, 2:deepening, 3:fireside, 4:supportingMaterial, 5:comment, 6:Fireside)
+		 tag: "Shilo" (this will be a 1 to 3 word) term
+		 weight: somekind of measurment on how relevant the tag is to the source type (1 to 100), 100 is most relevant
+		 distance: somekind of measurment on how far the source materials are - e.g. bible to bible (1-10), 1 is most close.
+		 
+Outline:
+	Fields - help here, we need user saved compilations of snippets, deepenings, comments, SupportingMaterial, Fireside.
+	This might need a bridge table, I don't know. We want the compilations to be saved by order of how the users lays them out. Please advise.
+	This will be related to a page where a user can drag from the right to the left, snippet, deepening, comment, supporting material and/or entire firesides. user can also quickly hide, remove add material at any time. This will be the most advanced feature of the project.
+	
+*Note these outlines need to be ordered carefully and in an advanced way. The user needs to be able to quickly sort, drag and drop and turn on/off sections and visiblility of data. Needs to be clean simple and advanced. All auto saved every 5 secs until session times out.
+From there the user can export as pdf, markdown or staic html+ images zip file.
+		 
+		
+User:
+	Fields - Help here - SuperAdmin, Admin, Participant, Guest
+	
+
+Entry:
+	Fields - help here we need to log who logged or add/updated/deleted in table data when and who.
+	e.g. "Joe B. (userId:432323) updated a Snippet (SnippetID:43454) on March 1st 2026."
+	
+	
+
+I need all the relevant pages for CRUD, page viewing, FAQ, operations for administration, user outlines, outline templates( just a n outline that can be copied and used by a user). CRUD will happen for all except Firesides table, this will be firestore manual entry initially.
+All db logic will follow microservices patterning of factory, repository patterning.
+All pages will use Tailwind for interaction and styling.
+Later we will integrate Gemini when needed.
+
+Before giving me any code (except some short examples) help me design this a bit better and more spec fleshed out.
+
+
+		
+		
