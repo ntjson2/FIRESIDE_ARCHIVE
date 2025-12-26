@@ -1,0 +1,96 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/user/$(request.auth.uid)).data.role in ['Admin', 'SuperAdmin'];
+    }
+    
+    function isSuperAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/user/$(request.auth.uid)).data.role == 'SuperAdmin';
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // User collection
+    match /user/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isSuperAdmin();
+    }
+    
+    // FiresideFamily collection
+    match /firesideFamily/{familyId} {
+      allow read: if true; // Public read
+      allow write: if isAdmin();
+    }
+    
+    // Fireside collection
+    match /fireside/{firesideId} {
+      allow read: if true; // Public read
+      allow write: if isAdmin();
+    }
+    
+    // Snippet collection
+    match /snippet/{snippetId} {
+      allow read: if true; // Public read for now
+      // TODO: Add visibility check - resource.data.visibility == 'public' || isAuthenticated()
+      allow write: if isAdmin();
+    }
+    
+    // Deepening collection
+    match /deepening/{deepeningId} {
+      allow read: if true; // Public read
+      allow write: if isAdmin();
+    }
+    
+    // SupportingMaterial collection
+    match /supportingMaterial/{materialId} {
+      allow read: if true; // Public read
+      allow write: if isAdmin();
+    }
+    
+    // Comment collection
+    match /comment/{commentId} {
+      allow read: if true; // Public read
+      allow create: if isAuthenticated();
+      allow update, delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+    
+    // Tag collection (global registry)
+    match /tag/{tagId} {
+      allow read: if true; // Public read
+      allow write: if isAdmin();
+    }
+    
+    // Outline collection (user-owned)
+    match /outline/{outlineId} {
+      allow read: if resource.data.isPublic == true || isOwner(resource.data.userId);
+      allow create: if isAuthenticated();
+      allow update, delete: if isOwner(resource.data.userId);
+    }
+    
+    // Media collection
+    match /media/{mediaId} {
+      allow read: if true; // Public read
+      allow write: if isAdmin();
+    }
+    
+    // AuditLog collection (future)
+    match /auditLog/{logId} {
+      allow read: if isAdmin();
+      allow write: if false; // Only server-side writes
+    }
+  }
+}

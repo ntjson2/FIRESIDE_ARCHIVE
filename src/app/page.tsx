@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { firesideService } from '@/services/firestoreService';
+import { firesideRepository } from '@/repositories';
 import { Fireside } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Plus, Calendar } from 'lucide-react';
@@ -14,7 +14,7 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchFiresides = async () => {
       try {
-        const data = await firesideService.getAll();
+        const data = await firesideRepository.findAll();
         setFiresides(data);
       } catch (error) {
         console.error('Error fetching firesides:', error);
