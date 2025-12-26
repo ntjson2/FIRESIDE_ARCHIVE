@@ -1,24 +1,72 @@
 # Fireside Archive - Project Specification
 
 ## 1. Project Overview
-A prototype website to store, manage, and compile snippets and deepenings from BUPC firesides. The system allows users to explore content, create custom outlines via drag-and-drop, and export them.
+A web-based and locally mirrorable system for collecting, searching, composing, and exporting short-form BUPC (Bahá'í) fireside deepenings. Content is stored as atomic snippets and assembled into teaching outlines. The system integrates a self-hosted, open-source AI for semantic search, suggestion, and outline assistance.
 
-## 2. Tech Stack
-- **Frontend Framework**: Next.js 14+ (App Router)
+**Core Philosophy**: Markdown-first, Atomic Content, Offline-Mirrorable, AI-Augmented (not dependent).
+
+**Primary Goals**:
+- Fast retrieval of short authoritative deepenings
+- Easy composition of outlines for teaching and reference
+- Clean export to PDF / Markdown
+- Privacy-respecting AI assistance
+- Simple mirroring for local or LAN-only use
+
+## 2. Core Design Principles
+- **Markdown-first** content model
+- **Atomic snippets, composable outlines**
+- **Offline-capable / mirrorable** architecture
+- **No vendor lock-in** for content
+- **AI-augmented, not AI-dependent**
+
+## 3. Tech Stack
+- **Frontend Framework**: Next.js 15 (App Router) with TypeScript
 - **Styling**: Tailwind CSS
 - **Database**: Firebase Firestore (NoSQL)
 - **Authentication**: Firebase Authentication
 - **State Management**: Zustand (for Outline editor state)
-- **Drag & Drop**: dnd-kit or react-beautiful-dnd
-- **AI Integration**: Gemini Pro API (Future integration)
+- **Editor**: Tiptap (WYSIWYG serialization to Markdown)
+- **Drag & Drop**: dnd-kit (Recommended for accessibility/performance)
+- **Export Engine**: Puppeteer (Server-side PDF generation) or Client-side fallback
+- **AI Integration**: Self-hosted LLM (Ollama / Mistral / Llama 3)
 
-## 3. User Roles
+## 4. AI Strategy (Specialist & Local-First)
+**Goal**: Create a "BUPC Specialist" AI that is free, open-source, and runs locally.
+
+### The Stack
+- **Base Model**: **Llama 3 (8B)** or **Mistral 7B**
+  - *Why*: "Sweet spot" for performance vs. hardware requirements (runs on consumer laptops)
+- **Engine**: **Ollama**
+  - *Role*: The local runtime to execute the model on Windows/Mac/Linux
+- **Training**: **Fine-Tuning with QLoRA**
+  - *Method*: Train the base model on the specific vocabulary, tone, and concepts of the archive
+  - *Artifact*: A lightweight "adapter" file distributed to users
+- **Retrieval**: **RAG (Retrieval Augmented Generation)**
+  - *Method*: Connect the AI to the Firestore/Vector database to fetch exact citations
+  - *Benefit*: Prevents hallucinations by grounding answers in the actual text
+
+### AI Capabilities
+- Semantic snippet discovery
+- Suggested snippet groupings
+- Optional outline suggestions
+- AI never overwrites source text
+- AI outputs references, not doctrine
+- Fully optional layer
+
+### Deployment Phases
+- **Phase 1 (Cloud Prototype)**: Use a Cloud API (e.g., Groq/Together AI) mimicking Llama 3 to build the UI and RAG logic
+- **Phase 2 (Local Transition)**:
+  - Train the QLoRA adapter on the dataset
+  - Create a custom Ollama Modelfile
+  - Switch the Next.js app to talk to `localhost:11434` (Ollama) instead of the Cloud API
+
+## 5. User Roles
 - **SuperAdmin**: Full system access, user management, schema changes.
 - **Admin**: Content management (CRUD on Snippets, Deepenings, etc.), view logs.
 - **Participant**: View content, create personal outlines, add comments (if enabled).
 - **Guest**: Read-only access to public content.
 
-## 4. Data Model (Firestore Schema)
+## 6. Data Model (Firestore Schema)
 
 ### `user` Collection
 - `uid` (string): Firebase Auth ID
@@ -101,7 +149,7 @@ A prototype website to store, manage, and compile snippets and deepenings from B
 - `dimensions` (string): Optional, e.g., "1920x1080"
 - `createdAt` (timestamp)
 
-### `auditLog` Collection
+### `auditLog` Collection (Future)
 - `id` (string): Auto-generated
 - `userId` (string): Who performed the action
 - `userName` (string): Cached display name
@@ -111,7 +159,7 @@ A prototype website to store, manage, and compile snippets and deepenings from B
 - `summary` (string): e.g., "Joe B. updated Snippet X"
 - `timestamp` (timestamp)
 
-## 5. Functional Requirements
+## 7. Functional Requirements
 
 ### Content Management (CRUD)
 - **Firesides**: Manual entry in Firestore initially (Read-only in app for now).
@@ -136,5 +184,63 @@ A prototype website to store, manage, and compile snippets and deepenings from B
 - **User Management**: Assign roles (SuperAdmin only).
 
 ### Architecture Patterns
-- **Service Layer**: Isolate Firestore logic (Factory/Repository pattern adaptation).
-- **Components**: Reusable Tailwind components.
+- **Repository Pattern**: Domain-specific data access in `src/repositories/`
+- **Factory Pattern**: Entity creation and validation in `src/factories/`
+- **Service Layer**: Business logic in `src/services/`
+- **Components**: Reusable Tailwind components in `src/components/`
+
+### Editor Specification
+- **Tiptap** WYSIWYG editor
+- **Supported formatting**:
+  - Headings (H1-H6)
+  - Bold / Italic / Underline
+  - Blockquotes
+  - Ordered & Unordered Lists
+  - Links
+  - No raw HTML
+  - Markdown serialization only
+
+### Search System
+- **Basic Search**: Firestore text + tag search
+- **AI-Enhanced Search**: Semantic query → AI returns ranked snippet IDs
+
+### Export System
+- **Supported Formats**: Markdown (.md), PDF
+- **PDF Pipeline**: Markdown → HTML → PDF (Puppeteer or client-side)
+
+### Authentication & Security
+- Firebase Auth (Email / OAuth optional)
+- Firestore security rules:
+  - Public read for public content
+  - Private write for authenticated users
+  - User-owned outlines
+
+## 8. Local / Offline Mirroring
+
+### Supported Modes
+- Full local Firebase emulator
+- LAN-only deployment
+- Static snapshot export
+
+### Data Portability
+- Markdown files exportable
+- JSON snapshot support
+- Git-friendly structure
+
+## 9. Deployment
+
+### Cloud
+- Firebase Hosting
+- Cloud Functions
+
+### Local
+- Docker Compose
+- `.env` driven configuration
+
+## 10. Non-Goals
+- No social network features
+- No AI-generated doctrine
+- No proprietary content lock-in
+
+## 11. Guiding Principle
+> **The system exists to support teaching and consultation, not to replace them.**

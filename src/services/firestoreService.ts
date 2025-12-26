@@ -1,82 +1,21 @@
+// Legacy service - use repositories from @/repositories instead
+// This file is kept for backward compatibility during migration
+
 import { 
-  collection, 
-  doc, 
-  getDocs, 
-  getDoc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy,
-  serverTimestamp,
-  DocumentData,
-  QueryConstraint
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { BaseEntity } from "@/types";
+  firesideFamilyRepository,
+  firesideRepository,
+  snippetRepository,
+  deepeningRepository,
+  outlineRepository,
+  mediaRepository
+} from '@/repositories';
 
-export class FirestoreService<T extends BaseEntity> {
-  private collectionName: string;
+// Re-export repositories as services for backward compatibility
+export const firesideFamilyService = firesideFamilyRepository;
+export const firesideService = firesideRepository;
+export const snippetService = snippetRepository;
+export const deepeningService = deepeningRepository;
+export const mediaService = mediaRepository;
+export const outlineService = outlineRepository;
 
-  constructor(collectionName: string) {
-    this.collectionName = collectionName;
-  }
-
-  // Get all documents
-  async getAll(constraints: QueryConstraint[] = []): Promise<T[]> {
-    const q = query(collection(db, this.collectionName), ...constraints);
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as T));
-  }
-
-  // Get a single document by ID
-  async getById(id: string): Promise<T | null> {
-    const docRef = doc(db, this.collectionName, id);
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() } as T;
-    } else {
-      return null;
-    }
-  }
-
-  // Create a new document
-  async create(data: Omit<T, 'id'>): Promise<T> {
-    const docRef = await addDoc(collection(db, this.collectionName), {
-      ...data,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-    
-    return { id: docRef.id, ...data } as T;
-  }
-
-  // Update a document
-  async update(id: string, data: Partial<T>): Promise<void> {
-    const docRef = doc(db, this.collectionName, id);
-    await updateDoc(docRef, {
-      ...data,
-      updatedAt: serverTimestamp()
-    });
-  }
-
-  // Delete a document
-  async delete(id: string): Promise<void> {
-    const docRef = doc(db, this.collectionName, id);
-    await deleteDoc(docRef);
-  }
-}
-
-// Export instances for specific collections
-export const firesideFamilyService = new FirestoreService<any>('firesideFamily');
-export const firesideService = new FirestoreService<any>('fireside');
-export const snippetService = new FirestoreService<any>('snippet');
-export const deepeningService = new FirestoreService<any>('deepening');
-export const supportingMaterialService = new FirestoreService<any>('supportingMaterial');
-export const mediaService = new FirestoreService<any>('media');
-export const outlineService = new FirestoreService<any>('outline');
+// Note: New code should import directly from @/repositories
