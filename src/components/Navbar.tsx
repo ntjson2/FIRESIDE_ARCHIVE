@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Moon, Sun } from 'lucide-react';
 
 export default function Navbar() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   return (
@@ -33,7 +33,7 @@ export default function Navbar() {
                   >
                     Firesides
                   </Link>
-                  {(user.role === 'Admin' || user.role === 'SuperAdmin') && (
+                  {(profile?.role === 'Admin' || profile?.role === 'SuperAdmin') && (
                     <Link 
                       href="/admin/seed" 
                       className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
