@@ -27,15 +27,22 @@ export default function Dashboard() {
   }, []);
 
   if (loading) {
-    return <div>Loading firesides...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading firesides...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Firesides</h1>
-          <p className="text-slate-500">Manage and view your fireside archive.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Firesides</h1>
+          <p className="text-muted-foreground">Manage and view your fireside archive.</p>
         </div>
         <Link href="/firesides/new">
           <Button>
@@ -52,14 +59,14 @@ export default function Dashboard() {
             href={`/firesides/${fireside.id}`}
             className="block group"
           >
-            <div className="bg-white rounded-lg border border-slate-200 p-6 hover:border-slate-300 hover:shadow-md transition-all">
-              <h3 className="text-xl font-semibold group-hover:text-blue-600 transition-colors">
+            <div className="bg-card rounded-lg border border-border p-6 hover:border-primary hover:shadow-lg transition-all duration-200">
+              <h3 className="text-xl font-semibold text-card-foreground group-hover:text-primary transition-colors">
                 {fireside.name}
               </h3>
-              <p className="text-slate-500 mt-2 line-clamp-2">
+              <p className="text-muted-foreground mt-2 line-clamp-2">
                 {fireside.description}
               </p>
-              <div className="mt-4 flex items-center text-sm text-slate-400">
+              <div className="mt-4 flex items-center text-sm text-muted-foreground">
                 <Calendar className="mr-2 h-4 w-4" />
                 {fireside.date?.seconds 
                   ? new Date(fireside.date.seconds * 1000).toLocaleDateString() 
@@ -70,8 +77,11 @@ export default function Dashboard() {
         ))}
 
         {firesides.length === 0 && (
-          <div className="col-span-full text-center py-12 bg-white rounded-lg border border-dashed border-slate-300">
-            <p className="text-slate-500">No firesides found. Create one to get started.</p>
+          <div className="col-span-full text-center py-12 bg-card rounded-lg border border-dashed border-border">
+            <div className="text-muted-foreground">
+              <p className="text-lg font-medium">No firesides found</p>
+              <p className="text-sm mt-1">Create one to get started or run the seed script.</p>
+            </div>
           </div>
         )}
       </div>

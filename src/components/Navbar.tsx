@@ -2,34 +2,70 @@
 
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import { Button } from '@/components/ui/button';
+import { Moon, Sun } from 'lucide-react';
 
 export default function Navbar() {
   const { user, loading } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   return (
-    <nav className="border-b border-slate-200 bg-white">
+    <nav className="border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex">
-            <Link href="/" className="flex-shrink-0 flex items-center font-bold text-xl">
-              Fireside Archive
+            <Link href="/" className="flex-shrink-0 flex items-center font-bold text-xl text-primary">
+              🔥 Fireside Archive
             </Link>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               <Link 
                 href="/" 
-                className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-slate-500 hover:text-slate-700 hover:border-slate-300"
+                className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
               >
                 Dashboard
               </Link>
-              {/* Add more links here */}
+              {user && (
+                <>
+                  <Link 
+                    href="/firesides" 
+                    className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+                  >
+                    Firesides
+                  </Link>
+                  {(user.role === 'Admin' || user.role === 'SuperAdmin') && (
+                    <Link 
+                      href="/admin/seed" 
+                      className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+                    >
+                      Seed Data
+                    </Link>
+                  )}
+                </>
+              )}
             </div>
           </div>
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleTheme}
+              className="w-9 px-0"
+              aria-label="Toggle theme"
+            >
+              {theme === 'light' ? (
+                <Moon className="h-4 w-4" />
+              ) : (
+                <Sun className="h-4 w-4" />
+              )}
+            </Button>
             {loading ? (
-              <span className="text-sm text-slate-500">Loading...</span>
+              <span className="text-sm text-muted-foreground">Loading...</span>
             ) : user ? (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground hidden sm:block">
+                  {user.displayName || user.email}
+                </span>
                 <Link href="/profile">
                   <Button variant="ghost" size="sm">
                     Profile
