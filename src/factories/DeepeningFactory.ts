@@ -10,7 +10,7 @@ export class DeepeningFactory extends BaseFactory<Deepening> {
       name: data.name!,
       text: data.text!,
       tags: data.tags || [],
-      mediaIds: data.mediaIds
+      mediaIds: data.mediaIds || []
     };
   }
 }

@@ -60,11 +60,22 @@ A web-based and locally mirrorable system for collecting, searching, composing, 
   - Create a custom Ollama Modelfile
   - Switch the Next.js app to talk to `localhost:11434` (Ollama) instead of the Cloud API
 
-## 5. User Roles
+## 5. User Roles & Permissions
 - **SuperAdmin**: Full system access, user management, schema changes.
-- **Admin**: Content management (CRUD on Snippets, Deepenings, etc.), view logs.
+- **Admin**: Content management (CRUD on Snippets, Deepenings, Firesides, Tags, Media), view logs.
 - **Participant**: View content, create personal outlines, add comments (if enabled).
 - **Guest**: Read-only access to public content.
+
+### Permission Matrix
+| Action | SuperAdmin | Admin | Participant | Guest |
+|--------|-----------|-------|-------------|-------|
+| Create/Edit/Delete Snippets | ✓ | ✓ | ✗ | ✗ |
+| Create/Edit/Delete Deepenings | ✓ | ✓ | ✗ | ✗ |
+| Create/Edit/Delete Firesides | ✓ | ✓ | ✗ | ✗ |
+| Create/Edit/Delete Tags | ✓ | ✓ | ✗ | ✗ |
+| Create/Edit Personal Outlines | ✓ | ✓ | ✓ | ✗ |
+| View Public Content | ✓ | ✓ | ✓ | ✓ |
+| User Management | ✓ | ✗ | ✗ | ✗ |
 
 ## 6. Data Model (Firestore Schema)
 
@@ -162,9 +173,17 @@ A web-based and locally mirrorable system for collecting, searching, composing, 
 ## 7. Functional Requirements
 
 ### Content Management (CRUD)
-- **Firesides**: Manual entry in Firestore initially (Read-only in app for now).
-- **Snippets/Deepenings**: Full CRUD for Admins.
+- **Firesides**: Full CRUD for Admin and SuperAdmin roles only.
+- **Snippets**: Full CRUD for Admin and SuperAdmin roles only.
+  - Create: Admin interface at `/admin/snippets/new`
+  - Edit: Admin interface at `/admin/snippets/[id]/edit`
+  - Delete: Confirmation required, decrements tag usage counts
+  - View: Public read access for all users
+- **Deepenings**: Full CRUD for Admin and SuperAdmin roles only.
 - **Tags**: Ability to associate tags with weight/distance metrics during creation/editing.
+  - Global tag registry managed automatically
+  - Usage counts tracked and maintained
+  - Admin and SuperAdmin can create/edit/delete tags
 
 ### Outline Editor (Advanced Feature)
 - **Interface**: Split screen or drawer.

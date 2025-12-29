@@ -6,9 +6,8 @@ export interface BaseEntity {
   updatedAt?: Timestamp;
 }
 
-export interface Tag {
+export interface SnippetTag {
   tagId: string;
-  name: string;
   weight: number; // 1-100
   distance: number; // 1-10
 }
@@ -37,7 +36,7 @@ export interface Snippet extends BaseEntity {
   name: string;
   text: string; // Markdown
   naturalOrder: number;
-  tags: Tag[];
+  tags: SnippetTag[];
   visibility: 'public' | 'private';
 }
 
@@ -45,7 +44,7 @@ export interface Deepening extends BaseEntity {
   snippetId: string;
   name: string;
   text: string; // Markdown
-  tags: Tag[];
+  tags: SnippetTag[];
   mediaIds?: string[];
 }
 

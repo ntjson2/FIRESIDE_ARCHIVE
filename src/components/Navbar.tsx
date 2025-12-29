@@ -25,23 +25,19 @@ export default function Navbar() {
               >
                 Dashboard
               </Link>
-              {user && (
-                <>
-                  <Link 
-                    href="/firesides" 
-                    className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
-                  >
-                    Firesides
-                  </Link>
-                  {(profile?.role === 'Admin' || profile?.role === 'SuperAdmin') && (
-                    <Link 
-                      href="/admin/seed" 
-                      className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
-                    >
-                      Seed Data
-                    </Link>
-                  )}
-                </>
+              <Link 
+                href="/firesides" 
+                className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+              >
+                Firesides
+              </Link>
+              {(profile?.role === 'Admin' || profile?.role === 'SuperAdmin') && (
+                <Link 
+                  href="/admin/snippets" 
+                  className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+                >
+                  Admin
+                </Link>
               )}
             </div>
           </div>
