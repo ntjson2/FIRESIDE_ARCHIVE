@@ -1,7 +1,15 @@
 # Fireside Archive Project - AI Coding Agent Instructions
 
 ## Project Overview
-Next.js 15 (App Router) + Firebase application for archiving Bahá'í fireside talks with hierarchical content structure. Authentication-gated content with role-based access (Participant, Moderator, Admin).
+Next.js 15 (App Router) + Firebase application for archiving Bahá'í fireside talks with hierarchical content structure. Authentication-gated content with role-based access (Guest, Participant, Admin, SuperAdmin).
+
+## Quick Reference
+- **Specialized Agents**: See [AGENTS.md](.github/AGENTS.md) for task-specific experts (firebase-expert, crud-builder, tag-specialist, etc.)
+- **Common Skills**: See [.github/skills/](.github/skills/) for step-by-step guides:
+  - `crud-page-builder.md` - Create admin CRUD pages
+  - `repository-factory-creator.md` - New data access layers
+  - `tag-management.md` - Work with normalized tags
+  - `firebase-operations.md` - Firestore queries and troubleshooting
 
 ## Architecture & Data Flow
 
@@ -142,3 +150,101 @@ if (user?.role !== 'Admin') return <Unauthorized />;
 - **Firebase Init**: [src/lib/firebase.ts](src/lib/firebase.ts)
 - **Repositories**: [src/repositories/](src/repositories/) - data access layer
 - **Factories**: [src/factories/](src/factories/) - entity creation logic
+
+## Common Issues & Quick Fixes
+
+### "Missing or insufficient permissions"
+**Cause**: Firestore security rules blocking query
+**Fix**: Use permission-aware queries (see [firebase-operations.md](.github/skills/firebase-operations.md))
+```typescript
+// BAD: Blocked by rules
+const all = await repository.findAll();
+
+// GOOD: Respects security
+const public = await repository.findWhere('isPublic', '==', true);
+const owned = await repository.findWhere('userId', '==', userId);
+```
+
+### "Cannot read properties of undefined"
+**Cause**: Old data missing new fields (tags, mediaIds, etc.)
+**Fix**: Use optional chaining and defaults
+```typescript
+const tags = (snippet.tags || []).map(t => t.tagId);
+sortedItems.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+```
+
+### "collection() cannot be called with an empty path"
+**Cause**: Repository missing `collectionName` property
+**Fix**: Use property syntax, not constructor (see [repository-factory-creator.md](.github/skills/repository-factory-creator.md))
+```typescript
+export class MyRepository extends BaseRepository<MyType> {
+  protected collectionName = 'myCollection'; // Not in constructor!
+}
+```
+
+### Async Params Error (Next.js 15+)
+**Cause**: `params` is now a Promise
+**Fix**: Unwrap with `React.use()`
+```typescript
+import { use } from 'react';
+
+export default function Page({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+}
+```
+
+### Tag System Issues
+**See**: [tag-management.md](.github/skills/tag-management.md) for complete tag patterns
+- Always increment/decrement counts when adding/removing tags
+- Use `findByName()` before creating to avoid duplicates
+- Handle undefined tags gracefully (old data compatibility)
+
+## Styling Guidelines
+
+### Theme System
+- **Light Mode**: Primary #2D6F52 (green), Background #FAFDFB (white)
+- **Dark Mode**: Primary #4A9070 (forest), Background #0A1510 (charcoal)
+- **Fonts**: IBM Plex Sans (300-700), IBM Plex Mono (400-600)
+
+### Tailwind Patterns
+```typescript
+// Cards
+<div className="bg-card border border-border rounded-lg p-6">
+
+// Hover states
+<div className="hover:bg-muted/30 transition-colors">
+
+// Buttons (use Button component)
+<Button variant="outline">Cancel</Button>
+<Button>Save</Button>
+
+// Loading spinner
+<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+```
+
+## Development Commands
+
+```bash
+# Development
+npm run dev                    # Start dev server (Turbopack)
+npm run build                  # Production build
+npm run lint                   # ESLint check
+
+# Firebase
+firebase deploy --only firestore:rules --project PROJECT_ID
+firebase deploy --only hosting --project PROJECT_ID
+
+# Database
+# Run seed via /admin/seed page (admin-only UI)
+```
+
+## When to Use Specialized Agents
+
+Ask to invoke specific agents from [AGENTS.md](.github/AGENTS.md) for:
+- **firebase-expert**: Security rules, complex queries, auth flows
+- **crud-builder**: Admin CRUD interfaces
+- **tag-specialist**: Tag features, autocomplete, usage tracking
+- **outline-architect**: Outline editor, hierarchical data
+- **theme-designer**: Styling, dark mode, components
+- **ai-integrator**: Local LLM, RAG, semantic search
+- **deployment-manager**: Production deploys, optimization
