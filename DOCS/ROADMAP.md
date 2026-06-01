@@ -117,17 +117,17 @@ Build a privacy-respecting, offline-capable archive for BUPC fireside content wi
   - [ ] Confirmation dialog
   - [ ] Cascade considerations
   
-#### Stage 1.3: Admin CRUD - Deepenings
-- [ ] **Create Deepening Form**
-  - [ ] Link to parent snippet
-  - [ ] Text editor for content
-  - [ ] Tag management
+#### Stage 1.3: Admin CRUD - Deepenings ✅
+- [x] **Create Deepening Form**
+  - [x] Link to parent snippet
+  - [x] Text editor for content
+  - [x] Tag management
   - [ ] Media attachment (future)
-- [ ] **Edit Deepening**
-  - [ ] Update deepening content
-  - [ ] Manage tags
-- [ ] **Delete Deepening**
-  - [ ] Confirmation with snippet reference
+- [x] **Edit Deepening**
+  - [x] Update deepening content
+  - [x] Manage tags
+- [x] **Delete Deepening**
+  - [x] Confirmation with snippet reference
 
 #### Stage 1.4: Admin CRUD - Firesides & Families
 - [ ] **FiresideFamily Management**

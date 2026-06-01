@@ -1,0 +1,301 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { deepeningRepository, snippetRepository, tagRepository } from '@/repositories';
+import { DeepeningFactory } from '@/factories';
+import { Snippet, TagEntity, SnippetTag } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useAuth } from '@/context/AuthContext';
+import { ArrowLeft, Save, Plus, X } from 'lucide-react';
+import Link from 'next/link';
+import ReactMarkdown from 'react-markdown';
+
+export default function NewDeepeningPage() {
+  const { profile } = useAuth();
+  const router = useRouter();
+  const [snippets, setSnippets] = useState<Snippet[]>([]);
+  const [allTags, setAllTags] = useState<TagEntity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Form state
+  const [snippetId, setSnippetId] = useState('');
+  const [name, setName] = useState('');
+  const [text, setText] = useState('');
+  const [tags, setTags] = useState<SnippetTag[]>([]);
+  const [newTagName, setNewTagName] = useState('');
+  const [newTagWeight, setNewTagWeight] = useState('1');
+  const [newTagDistance, setNewTagDistance] = useState('0');
+
+  // Track temp tag names separately: tempId -> name
+  const [tempTagNames, setTempTagNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (profile && profile.role !== 'Admin' && profile.role !== 'SuperAdmin') {
+      router.push('/');
+    }
+  }, [profile, router]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [snippetData, tagData] = await Promise.all([
+          snippetRepository.findAll(),
+          tagRepository.findAll()
+        ]);
+        setSnippets(snippetData.sort((a: Snippet, b: Snippet) => (a.name || '').localeCompare(b.name || '')));
+        setAllTags(tagData.sort((a: TagEntity, b: TagEntity) => (a.name || '').localeCompare(b.name || '')));
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const handleAddTag = () => {
+    if (!newTagName.trim()) return;
+
+    const existingTag = allTags.find(t => t.name?.toLowerCase() === newTagName.toLowerCase());
+
+    if (existingTag) {
+      if (tags.some(t => t.tagId === existingTag.id)) {
+        alert('This tag is already added');
+        return;
+      }
+      setTags([...tags, { tagId: existingTag.id, weight: parseInt(newTagWeight), distance: parseInt(newTagDistance) }]);
+    } else {
+      const tempId = `temp_${Date.now()}_${newTagName}`;
+      setTags([...tags, { tagId: tempId, weight: parseInt(newTagWeight), distance: parseInt(newTagDistance) }]);
+      setTempTagNames(prev => ({ ...prev, [tempId]: newTagName.trim() }));
+    }
+
+    setNewTagName('');
+    setNewTagWeight('1');
+    setNewTagDistance('0');
+  };
+
+  const handleRemoveTag = (tagId: string) => {
+    setTags(tags.filter(t => t.tagId !== tagId));
+    if (tagId.startsWith('temp_')) {
+      setTempTagNames(prev => { const n = { ...prev }; delete n[tagId]; return n; });
+    }
+  };
+
+  const getTagName = (tagId: string): string => {
+    if (tagId.startsWith('temp_')) return tempTagNames[tagId] || 'New tag';
+    return allTags.find(t => t.id === tagId)?.name || 'Unknown';
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!snippetId || !name.trim() || !text.trim()) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Resolve temp tags
+      const processedTags: SnippetTag[] = [];
+      for (const tag of tags) {
+        if (tag.tagId.startsWith('temp_')) {
+          const tagName = tempTagNames[tag.tagId];
+          let resolved = await tagRepository.findByName(tagName);
+          if (!resolved) {
+            const createdId = await tagRepository.save({ name: tagName, count: 0, mediaIds: [] });
+            resolved = await tagRepository.findById(createdId);
+          }
+          if (resolved) {
+            processedTags.push({ tagId: resolved.id, weight: tag.weight, distance: tag.distance });
+            await tagRepository.incrementCount(resolved.id);
+          }
+        } else {
+          processedTags.push(tag);
+          await tagRepository.incrementCount(tag.tagId);
+        }
+      }
+
+      const factory = new DeepeningFactory();
+      const deepening = factory.create({ snippetId, name, text, tags: processedTags });
+      await deepeningRepository.save(deepening);
+      router.push('/admin/deepenings');
+    } catch (error) {
+      console.error('Error saving deepening:', error);
+      alert('Failed to save deepening');
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6">
+      <div className="flex items-center gap-4">
+        <Link href="/admin/deepenings">
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+        </Link>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">New Deepening</h1>
+          <p className="text-muted-foreground">Create a deepening linked to a snippet.</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="bg-card rounded-lg border border-border p-6 space-y-6">
+
+          {/* Snippet Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="snippet">Parent Snippet *</Label>
+            <select
+              id="snippet"
+              value={snippetId}
+              onChange={(e) => setSnippetId(e.target.value)}
+              className="w-full px-3 py-2 border border-border rounded-md bg-background"
+              required
+            >
+              <option value="">Select a snippet...</option>
+              {snippets.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Name */}
+          <div className="space-y-2">
+            <Label htmlFor="name">Deepening Name *</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter deepening name"
+              required
+            />
+          </div>
+
+          {/* Text Content */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label htmlFor="text">Content * (Markdown supported)</Label>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setShowPreview(!showPreview)}>
+                {showPreview ? 'Edit' : 'Preview'}
+              </Button>
+            </div>
+            {showPreview ? (
+              <div className="w-full min-h-[300px] p-4 border border-border rounded-md bg-background prose prose-sm max-w-none">
+                <ReactMarkdown>{text}</ReactMarkdown>
+              </div>
+            ) : (
+              <textarea
+                id="text"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                className="w-full min-h-[300px] px-3 py-2 border border-border rounded-md bg-background font-mono text-sm"
+                placeholder="Enter deepening content (markdown supported)"
+                required
+              />
+            )}
+          </div>
+
+          {/* Tags */}
+          <div className="space-y-4">
+            <Label>Tags</Label>
+
+            {/* Current Tags */}
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <div
+                    key={tag.tagId}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20"
+                  >
+                    <span className="text-sm font-medium">{getTagName(tag.tagId)}</span>
+                    <span className="text-xs text-muted-foreground ml-1">
+                      w:{tag.weight} d:{tag.distance}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTag(tag.tagId)}
+                      className="ml-1 text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add Tag Row */}
+            <div className="flex gap-2 items-end">
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs text-muted-foreground">Tag name</Label>
+                <Input
+                  list="tag-suggestions"
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
+                  placeholder="Type or select tag"
+                />
+                <datalist id="tag-suggestions">
+                  {allTags.map(t => <option key={t.id} value={t.name} />)}
+                </datalist>
+              </div>
+              <div className="w-20 space-y-1">
+                <Label className="text-xs text-muted-foreground">Weight (1-100)</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={newTagWeight}
+                  onChange={(e) => setNewTagWeight(e.target.value)}
+                />
+              </div>
+              <div className="w-20 space-y-1">
+                <Label className="text-xs text-muted-foreground">Distance (0-10)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="10"
+                  value={newTagDistance}
+                  onChange={(e) => setNewTagDistance(e.target.value)}
+                />
+              </div>
+              <Button type="button" variant="outline" onClick={handleAddTag}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Submit */}
+        <div className="flex justify-end gap-3">
+          <Link href="/admin/deepenings">
+            <Button type="button" variant="outline">Cancel</Button>
+          </Link>
+          <Button type="submit" disabled={saving}>
+            <Save className="mr-2 h-4 w-4" />
+            {saving ? 'Saving...' : 'Save Deepening'}
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}

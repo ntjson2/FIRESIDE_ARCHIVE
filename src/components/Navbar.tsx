@@ -32,12 +32,20 @@ export default function Navbar() {
                 Firesides
               </Link>
               {(profile?.role === 'Admin' || profile?.role === 'SuperAdmin') && (
-                <Link 
-                  href="/admin/snippets" 
-                  className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
-                >
-                  Admin
-                </Link>
+                <>
+                  <Link 
+                    href="/admin/snippets" 
+                    className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+                  >
+                    Snippets
+                  </Link>
+                  <Link 
+                    href="/admin/deepenings" 
+                    className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+                  >
+                    Deepenings
+                  </Link>
+                </>
               )}
             </div>
           </div>
