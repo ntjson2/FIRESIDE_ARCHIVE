@@ -3,7 +3,8 @@ import {
   firesideRepository, 
   snippetRepository,
   deepeningRepository,
-  tagRepository
+  tagRepository,
+  referenceRepository
 } from "@/repositories";
 import { 
   FiresideFamilyFactory, 
@@ -219,11 +220,132 @@ The human soul transcends physical reality and exists beyond material constraint
     await tagRepository.incrementCount(tagMap["Soul"]);
     await tagRepository.incrementCount(tagMap["Immortality"]);
 
+    // 6. Create References
+    console.log("\nCreating References...");
+
+    // Academic Book Reference
+    const ref1 = await referenceRepository.save({
+      title: "The Purpose of Life: Perspectives from the Bahá'í Writings",
+      sourceType: "book" as const,
+      citationFormat: "apa-7" as const,
+      formattedAPA: "Smith, J. M., & Johnson, K. L. (2021). The purpose of life: Perspectives from the Bahá'í writings. Oxford University Press.",
+      authors: [
+        { lastName: "Smith", initials: "J.M." },
+        { lastName: "Johnson", initials: "K.L." }
+      ],
+      year: 2021,
+      publisher: "Oxford University Press",
+      pages: "1-284",
+      validationStatus: "valid" as const,
+      validatedAt: Timestamp.now(),
+      createdBy: "admin",
+      linkedItems: [
+        { itemId: snippet1Id, itemType: "snippet" as const }
+      ]
+    });
+    console.log("✅ Created Reference: Academic Book");
+
+    // Journal Article Reference
+    const ref2 = await referenceRepository.save({
+      title: "Spiritual Development and Personal Growth: A Comparative Study",
+      sourceType: "journal" as const,
+      citationFormat: "apa-7" as const,
+      formattedAPA: "Williams, R., Chen, M., & Patel, S. (2022). Spiritual development and personal growth: A comparative study. Journal of Religious Studies, 45(3), 267-289.",
+      authors: [
+        { lastName: "Williams", initials: "R." },
+        { lastName: "Chen", initials: "M." },
+        { lastName: "Patel", initials: "S." }
+      ],
+      year: 2022,
+      journal: "Journal of Religious Studies",
+      volume: "45",
+      issue: "3",
+      pages: "267-289",
+      doi: "10.1234/jrs.2022.045.003",
+      validationStatus: "valid" as const,
+      validatedAt: Timestamp.now(),
+      createdBy: "admin",
+      linkedItems: [
+        { itemId: snippet2Id, itemType: "snippet" as const }
+      ]
+    });
+    console.log("✅ Created Reference: Journal Article");
+
+    // Website Reference
+    const ref3 = await referenceRepository.save({
+      title: "Understanding the Soul in World Religions",
+      sourceType: "website" as const,
+      citationFormat: "apa-7" as const,
+      formattedAPA: "Religious Studies Center. (2024). Understanding the soul in world religions. Retrieved June 7, 2026, from https://example.org/soul-religions",
+      url: "https://example.org/soul-religions",
+      accessDate: Timestamp.now(),
+      validationStatus: "valid" as const,
+      validatedAt: Timestamp.now(),
+      createdBy: "admin",
+      linkedItems: [
+        { itemId: snippet3Id, itemType: "snippet" as const }
+      ]
+    });
+    console.log("✅ Created Reference: Website");
+
+    // Bahá'í Text Reference
+    const ref4 = await referenceRepository.save({
+      title: "Kitáb-i-Íqán (The Book of Certitude)",
+      sourceType: "bahai-text" as const,
+      citationFormat: "bahai" as const,
+      formattedAPA: "Bahá'u'lláh. (1992). The Kitáb-i-Íqán (The Book of Certitude) (J. R. Cole, Trans.). Bahá'í Publishing Trust.",
+      speaker: "Bahá'u'lláh",
+      pages: "chapters 1-3",
+      validationStatus: "valid" as const,
+      validatedAt: Timestamp.now(),
+      createdBy: "admin",
+      linkedItems: [
+        { itemId: deepeningData.snippetId, itemType: "snippet" as const }
+      ]
+    });
+    console.log("✅ Created Reference: Bahá'í Text");
+
+    // Spiritual Concept Reference
+    const ref5 = await referenceRepository.save({
+      title: "The Concept of Suffering as a Path to Spiritual Growth",
+      sourceType: "spiritual-concept" as const,
+      citationFormat: "descriptive" as const,
+      formattedAPA: "The concept of suffering as a path to spiritual growth is found throughout Bahá'í teachings and has been explored in various talks and writings.",
+      conceptualMeta: {
+        relatedConcepts: ["testing", "spirituality", "personal development", "divine wisdom"],
+        teachingContext: "Central to understanding Bahá'í philosophy",
+        applicableTo: ["personal challenges", "community struggles", "spiritual education"]
+      },
+      validationStatus: "valid" as const,
+      validatedAt: Timestamp.now(),
+      createdBy: "admin",
+      linkedItems: [
+        { itemId: snippet4Id, itemType: "snippet" as const }
+      ]
+    });
+    console.log("✅ Created Reference: Spiritual Concept");
+
+    // Oral Tradition Reference
+    const ref6 = await referenceRepository.save({
+      title: "Community Wisdom on Soul Development",
+      sourceType: "oral-tradition" as const,
+      citationFormat: "descriptive" as const,
+      formattedAPA: "Teaching on soul development and immortality documented by the Archive team from community gatherings and study circles, 2024.",
+      speaker: "Community Members",
+      transcribedBy: "Archive Team",
+      date: Timestamp.fromDate(new Date("2024-03-15")),
+      validationStatus: "valid" as const,
+      validatedAt: Timestamp.now(),
+      createdBy: "admin"
+    });
+    console.log("✅ Created Reference: Oral Tradition");
+
     console.log("\n🎉 Seed complete! Created:");
     console.log("   - 2 Fireside Families");
     console.log("   - 2 Firesides");
     console.log("   - 5 Snippets");
     console.log("   - 1 Deepening");
+    console.log("   - 6 References (Book, Journal, Website, Bahá'í Text, Spiritual Concept, Oral Tradition)");
     
     return {
       success: true,

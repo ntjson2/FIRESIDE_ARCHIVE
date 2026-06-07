@@ -23,6 +23,11 @@ export interface ConceptualMetadata {
   applicableTo: string[];
 }
 
+export interface LinkedItem {
+  itemId: string;
+  itemType: 'snippet' | 'deepening' | 'media';
+}
+
 export interface ReferenceEntity extends BaseEntity {
   // Core fields
   title: string;
@@ -52,6 +57,9 @@ export interface ReferenceEntity extends BaseEntity {
   validationStatus: 'pending' | 'valid' | 'invalid' | 'offline-check';
   validatedAt?: Timestamp;
   validationErrors?: string[];
+
+  // Linking to snippets, deepenings, media
+  linkedItems?: LinkedItem[];
 
   // Metadata
   createdBy: string;
