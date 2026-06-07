@@ -12,6 +12,58 @@ export interface SnippetTag {
   distance: number; // 1-10
 }
 
+export interface CitationAuthor {
+  lastName: string;
+  initials: string;
+}
+
+export interface ConceptualMetadata {
+  relatedConcepts: string[];
+  teachingContext: string;
+  applicableTo: string[];
+}
+
+export interface ReferenceEntity extends BaseEntity {
+  // Core fields
+  title: string;
+  sourceType: 'book' | 'journal' | 'website' | 'other' | 'bahai-text' | 'religious-scripture' | 'spiritual-concept' | 'oral-tradition';
+  citationFormat: 'apa-7' | 'bahai' | 'religious' | 'descriptive' | 'custom';
+
+  // Academic publication fields (optional)
+  authors?: CitationAuthor[];
+  year?: number;
+  publisher?: string;
+  journal?: string;
+  volume?: string;
+  issue?: string;
+  pages?: string;
+  doi?: string;
+  url?: string;
+  accessDate?: Timestamp;
+
+  // Bahai/Spiritual fields (optional)
+  speaker?: string;
+  date?: Timestamp;
+  transcribedBy?: string;
+  conceptualMeta?: ConceptualMetadata;
+
+  // Formatted output & validation
+  formattedAPA: string;
+  validationStatus: 'pending' | 'valid' | 'invalid' | 'offline-check';
+  validatedAt?: Timestamp;
+  validationErrors?: string[];
+
+  // Metadata
+  createdBy: string;
+}
+
+export interface ContentReference {
+  refId: string;
+  page?: string;
+  context?: string;
+  relationshipType?: 'cites' | 'illustrates' | 'derived-from' | 'contradicts' | 'extends';
+}
+
 export interface TagEntity extends BaseEntity {
   name: string;
   count: number;
@@ -37,6 +89,7 @@ export interface Snippet extends BaseEntity {
   text: string; // Markdown
   naturalOrder: number;
   tags: SnippetTag[];
+  references?: ContentReference[];
   visibility: 'public' | 'private';
 }
 
@@ -45,6 +98,7 @@ export interface Deepening extends BaseEntity {
   name: string;
   text: string; // Markdown
   tags: SnippetTag[];
+  references?: ContentReference[];
   mediaIds?: string[];
 }
 
@@ -62,6 +116,7 @@ export interface Media extends BaseEntity {
   size: number; // in bytes
   type: string; // MIME type e.g. "image/jpeg"
   dimensions?: string; // e.g. "1920x1080"
+  references?: ContentReference[];
 }
 
 export interface Comment extends BaseEntity {

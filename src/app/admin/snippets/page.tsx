@@ -6,7 +6,7 @@ import { snippetRepository, firesideRepository, tagRepository } from '@/reposito
 import { Snippet, Fireside, TagEntity } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Eye, Trash2 } from 'lucide-react';
+import { Plus, Search, Edit, Eye, Trash2, BookOpen } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 
@@ -181,6 +181,11 @@ export default function AdminSnippetsPage() {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center justify-end gap-2">
+                          <Link href={`/admin/references/new?linkedTo=${snippet.id}&type=snippet`}>
+                            <Button variant="ghost" size="sm" title="Add reference">
+                              <BookOpen className="h-4 w-4" />
+                            </Button>
+                          </Link>
                           <Link href={`/admin/snippets/${snippet.id}/edit`}>
                             <Button variant="ghost" size="sm">
                               <Edit className="h-4 w-4" />

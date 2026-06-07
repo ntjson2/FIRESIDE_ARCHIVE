@@ -5,6 +5,7 @@ export { SnippetRepository, snippetRepository } from './SnippetRepository';
 export { DeepeningRepository, deepeningRepository } from './DeepeningRepository';
 export { OutlineRepository, outlineRepository } from './OutlineRepository';
 export { MediaRepository, mediaRepository } from './MediaRepository';
+export { ReferenceRepository, referenceRepository } from './ReferenceRepository';
 
 // TagRepository must be imported first, then instantiated
 import { TagRepository as TagRepositoryClass } from './TagRepository';

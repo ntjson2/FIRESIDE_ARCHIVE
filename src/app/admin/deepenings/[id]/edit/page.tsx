@@ -2,14 +2,14 @@
 
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { deepeningRepository, snippetRepository, tagRepository } from '@/repositories';
+import { deepeningRepository, snippetRepository, tagRepository, referenceRepository } from '@/repositories';
 import { DeepeningFactory } from '@/factories';
-import { Deepening, Snippet, TagEntity, SnippetTag } from '@/types';
+import { Deepening, Snippet, TagEntity, SnippetTag, ReferenceEntity } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
-import { ArrowLeft, Save, Plus, X, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, Plus, X, Trash2, BookOpen, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 
@@ -21,6 +21,7 @@ export default function EditDeepeningPage({ params }: { params: Promise<{ id: st
   const [deepening, setDeepening] = useState<Deepening | null>(null);
   const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [allTags, setAllTags] = useState<TagEntity[]>([]);
+  const [references, setReferences] = useState<ReferenceEntity[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -46,10 +47,11 @@ export default function EditDeepeningPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [deepeningData, snippetData, tagData] = await Promise.all([
+        const [deepeningData, snippetData, tagData, referenceData] = await Promise.all([
           deepeningRepository.findById(id),
           snippetRepository.findAll(),
-          tagRepository.findAll()
+          tagRepository.findAll(),
+          referenceRepository.findAll()
         ]);
 
         if (!deepeningData) {
@@ -67,6 +69,12 @@ export default function EditDeepeningPage({ params }: { params: Promise<{ id: st
 
         setSnippets(snippetData.sort((a: Snippet, b: Snippet) => (a.name || '').localeCompare(b.name || '')));
         setAllTags(tagData.sort((a: TagEntity, b: TagEntity) => (a.name || '').localeCompare(b.name || '')));
+        
+        // Load references linked to this deepening
+        const linkedRefs = referenceData.filter((ref: ReferenceEntity) =>
+          ref.linkedItems?.some(item => item.itemId === id && item.itemType === 'deepening')
+        );
+        setReferences(linkedRefs);
       } catch (error) {
         console.error('Error fetching data:', error);
         alert('Failed to load deepening');
@@ -269,6 +277,49 @@ export default function EditDeepeningPage({ params }: { params: Promise<{ id: st
                 placeholder="Enter deepening content (markdown supported)"
                 required
               />
+            )}
+          </div>
+
+          {/* References */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                References
+              </Label>
+              <Link href={`/admin/references/new?linkedTo=${id}&type=deepening`}>
+                <Button type="button" variant="outline" size="sm">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Reference
+                </Button>
+              </Link>
+            </div>
+
+            {references.length > 0 ? (
+              <div className="space-y-2">
+                {references.map((ref) => (
+                  <div key={ref.id} className="flex items-center justify-between p-3 rounded-md bg-secondary/10 border border-secondary/20">
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{ref.title}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {ref.sourceType} • {ref.citationFormat}
+                      </div>
+                      {ref.formattedAPA && (
+                        <div className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                          {ref.formattedAPA}
+                        </div>
+                      )}
+                    </div>
+                    <Link href={`/admin/references/${ref.id}`}>
+                      <Button type="button" variant="ghost" size="sm">
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">No references linked yet. Click "Add Reference" to get started.</p>
             )}
           </div>
 

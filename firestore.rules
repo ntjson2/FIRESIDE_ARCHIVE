@@ -86,6 +86,12 @@ service cloud.firestore {
       allow read: if true; // Public read
       allow write: if isAdmin();
     }
+
+    // References collection (global registry)
+    match /references/{referenceId} {
+      allow read: if true; // Public read
+      allow write: if isAdmin();
+    }
     
     // AuditLog collection (future)
     match /auditLog/{logId} {
