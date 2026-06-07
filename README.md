@@ -82,7 +82,192 @@ npm run start        # Start production server
 npm run lint         # Run ESLint
 ```
 
-## Core Concepts
+## Common Terminal Commands
+
+### Development
+
+```bash
+# Start development server on port 3000
+npm run dev
+
+# Start on custom port (e.g., 3001)
+npm run dev -- -p 3001
+
+# Build for production
+npm run build
+
+# Start production server (after build)
+npm run start
+
+# Check TypeScript compilation
+npx tsc --noEmit
+
+# Run linter
+npm run lint
+
+# Fix linting errors automatically
+npx eslint src --fix
+```
+
+### Testing & Validation
+
+```bash
+# Seed Firestore with test data
+# (Run this once at project start)
+node -e "const seed = require('./src/lib/seed'); seed.seedData();"
+
+# View Firebase Firestore console
+firebase firestore:inspect
+
+# Check Firebase project status
+firebase projects:list
+
+# Validate firestore.rules
+firebase deploy --only firestore:rules --dry-run
+```
+
+### Firebase Deployment
+
+```bash
+# Login to Firebase
+firebase login
+
+# Deploy everything (functions, hosting, firestore)
+firebase deploy
+
+# Deploy only Firestore rules
+firebase deploy --only firestore
+
+# Deploy only Firestore indexes
+firebase deploy --only firestore:indexes
+
+# Deploy with dry-run (preview changes without applying)
+firebase deploy --dry-run
+
+# View deployment history
+firebase deploy:log
+```
+
+### Database Management
+
+```bash
+# Export Firestore data
+firebase firestore:delete --export-path ./backup --all-collections
+
+# Import Firestore data from backup
+firebase firestore:delete --all-collections --yes && firebase firestore:import ./backup
+
+# Clear entire database (WARNING: destructive)
+firebase firestore:delete --all-collections --yes
+
+# View specific collection in Firestore
+firebase firestore:get --collection references --limit 10
+
+# Watch collection changes in real-time
+firebase firestore:query collections/snippets --limit 5
+```
+
+### Local Development (WSL/Linux)
+
+```bash
+# If running in WSL, build context might be needed
+# Kill hung dev processes
+pkill -9 -f "next dev"
+
+# Restart dev server
+npm run dev
+
+# Check if port 3000/3001 is in use
+lsof -i :3000
+
+# Kill process on specific port
+kill -9 $(lsof -t -i:3000)
+```
+
+### Environment & Configuration
+
+```bash
+# View current environment variables
+cat .env.local
+
+# Validate required env vars are set
+grep -E "NEXT_PUBLIC|GEMINI_API_KEY" .env.local
+
+# Recreate env file from example
+cp .env.local.example .env.local
+# Then edit with your credentials
+```
+
+### Code Quality
+
+```bash
+# Run full type check
+npx tsc --noEmit --listFiles
+
+# Find unused imports/variables
+npx eslint src --no-eslintrc --parser-options=ecmaVersion:12
+
+# Format code with Prettier (if configured)
+npx prettier --write "src/**/*.{ts,tsx}"
+```
+
+### Debugging
+
+```bash
+# Enable verbose logging for Next.js
+DEBUG=* npm run dev
+
+# Check build size
+npm run build && npm ls
+
+# View compiled code size
+npx next build --analyze
+
+# Inspect TypeScript errors in detail
+npx tsc src/**/*.tsx --noEmit --pretty false
+```
+
+### Cleanup & Maintenance
+
+```bash
+# Remove node_modules and reinstall
+rm -rf node_modules package-lock.json && npm install
+
+# Clean build artifacts
+rm -rf .next && npm run build
+
+# Clear Firebase cache
+rm -rf ~/.cache/firebase
+
+# Check for outdated dependencies
+npm outdated
+
+# Update all dependencies
+npm update
+```
+
+### Quick Reference: Before Deployment
+
+```bash
+# 1. Update environment variables
+nano .env.local
+
+# 2. Check types and linting
+npx tsc --noEmit && npm run lint
+
+# 3. Build locally
+npm run build
+
+# 4. Verify Firestore rules
+firebase deploy --only firestore --dry-run
+
+# 5. Deploy to Firebase
+firebase deploy
+```
+
+---
+
+
 
 ### Data Hierarchy
 - **FiresideFamily** → **Fireside** → **Snippet** → **Deepening**
