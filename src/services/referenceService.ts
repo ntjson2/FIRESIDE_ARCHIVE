@@ -1,6 +1,6 @@
 'use client';
 
-import { ReferenceEntity, CitationAuthor, ConceptualMetadata } from '@/types';
+import { ReferenceEntity, CitationAuthor, ConceptualMetadata, ContentReference } from '@/types';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -29,7 +29,7 @@ export class ReferenceService {
 
   async validateWithSourceType(
     rawCitation: string,
-    sourceType: string
+    sourceType: ReferenceEntity['sourceType']
   ): Promise<ValidationResult> {
     try {
       const prompt = this.getValidationPrompt(rawCitation, sourceType);
@@ -85,7 +85,7 @@ export class ReferenceService {
     return this.validateWithSourceType(rawCitation, 'oral-tradition');
   }
 
-  private detectSourceType(rawCitation: string): string {
+  private detectSourceType(rawCitation: string): ReferenceEntity['sourceType'] {
     const lower = rawCitation.toLowerCase();
 
     // Check for Bahai texts
@@ -272,7 +272,7 @@ Validation Rules for Academic Sources:
     });
   }
 
-  private parseGeminiResponse(response: string, sourceType: string): ValidationResult {
+  private parseGeminiResponse(response: string, sourceType: ReferenceEntity['sourceType']): ValidationResult {
     try {
       // Remove markdown code blocks if present
       let jsonStr = response.trim();
@@ -317,7 +317,7 @@ Validation Rules for Academic Sources:
     }
   }
 
-  private getCitationFormat(sourceType: string): string {
+  private getCitationFormat(sourceType: ReferenceEntity['sourceType']): ReferenceEntity['citationFormat'] {
     switch (sourceType) {
       case 'bahai-text':
         return 'bahai';

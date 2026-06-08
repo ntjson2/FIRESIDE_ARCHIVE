@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ReferenceEntity } from '@/types';
 import { referenceService, ValidationResult } from '@/services/referenceService';
@@ -20,13 +20,21 @@ const SOURCE_TYPES = [
 ];
 
 export default function NewReferencePage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-center"><Loader className="w-6 h-6 animate-spin mx-auto" /></div>}>
+      <NewReferenceForm />
+    </Suspense>
+  );
+}
+
+function NewReferenceForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const linkedTo = searchParams.get('linkedTo');
   const linkedType = searchParams.get('type') as 'snippet' | 'deepening' | null;
   
   const [rawCitation, setRawCitation] = useState('');
-  const [sourceType, setSourceType] = useState('');
+  const [sourceType, setSourceType] = useState<string>('');
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -41,7 +49,7 @@ export default function NewReferencePage() {
     try {
       let result: ValidationResult;
       if (sourceType) {
-        result = await referenceService.validateWithSourceType(rawCitation, sourceType);
+        result = await referenceService.validateWithSourceType(rawCitation, sourceType as ReferenceEntity['sourceType']);
       } else {
         result = await referenceService.validateAndFormatReference(rawCitation);
       }
