@@ -32,7 +32,7 @@ export interface ReferenceEntity extends BaseEntity {
   // Core fields
   title: string;
   sourceType: 'book' | 'journal' | 'website' | 'other' | 'bahai-text' | 'religious-scripture' | 'spiritual-concept' | 'oral-tradition';
-  citationFormat: 'apa-7' | 'bahai' | 'religious' | 'descriptive' | 'custom';
+  citationFormat: 'apa-7' | 'chicago' | 'bahai' | 'religious' | 'descriptive' | 'custom';
 
   // Academic publication fields (optional)
   authors?: CitationAuthor[];

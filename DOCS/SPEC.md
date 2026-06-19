@@ -28,7 +28,9 @@ A web-based and locally mirrorable system for collecting, searching, composing, 
 - **Editor**: Tiptap (WYSIWYG serialization to Markdown)
 - **Drag & Drop**: dnd-kit (Recommended for accessibility/performance)
 - **Export Engine**: Puppeteer (Server-side PDF generation) or Client-side fallback
-- **AI Integration**: Self-hosted LLM (Ollama / Mistral / Llama 3)
+- **AI Integration**: DeepSeek v4 (primary cloud AI, OpenAI-compatible API), Ollama (local fallback with Llama 3 / Mistral 7B)
+- **Online Reference Lookup**: Crossref API (academic), Google Books API (free, no API key)
+- **AI Provider Fallback Chain**: DeepSeek → Ollama → Local offline mock
 
 ## 4. AI Strategy (Specialist & Local-First)
 **Goal**: Create a "BUPC Specialist" AI that is free, open-source, and runs locally.
@@ -53,12 +55,19 @@ A web-based and locally mirrorable system for collecting, searching, composing, 
 - AI outputs references, not doctrine
 - Fully optional layer
 
+### AI Provider Fallback Chain
+The service uses a priority-based provider chain:
+1. **DeepSeek v4** (primary cloud AI) — OpenAI-compatible API, fast and cost-effective
+2. **Ollama** (local fallback) — Llama 3 / Mistral 7B running on `localhost:11434`
+3. **Local offline mock** (development only) — regex-based validation fallback
+
 ### Deployment Phases
-- **Phase 1 (Cloud Prototype)**: Use a Cloud API (e.g., Groq/Together AI) mimicking Llama 3 to build the UI and RAG logic
+- **Phase 1 (Cloud Prototype)**: Use DeepSeek v4 API (OpenAI-compatible) to build the UI, advisory pipeline, and RAG logic. Environment variable: `NEXT_PUBLIC_DEEPSEEK_API_KEY`.
 - **Phase 2 (Local Transition)**:
   - Train the QLoRA adapter on the dataset
   - Create a custom Ollama Modelfile
-  - Switch the Next.js app to talk to `localhost:11434` (Ollama) instead of the Cloud API
+  - Switch the Next.js app to talk to `localhost:11434` (Ollama) instead of DeepSeek API
+  - Fall back to Ollama automatically when DeepSeek is unavailable
 
 ## 5. User Roles & Permissions
 - **SuperAdmin**: Full system access, user management, schema changes.
@@ -323,12 +332,19 @@ A web-based and locally mirrorable system for collecting, searching, composing, 
 | Download References (APA, BibTeX, etc.) | ✓ | ✓ | ✓ | ✓ |
 
 #### LLM Validation Service
-**Multi-Format Validation**: Different validation rules and prompts by source type
+**Advisory Pipeline**: The reference system now uses a three-step "check → advise → rewrite" flow.
 
-- **API Integration**: Groq, Together AI, or OpenAI API with context-aware system prompts
-  - Routes validation request to source-type-specific prompt
-  - Groq recommended for speed/cost on open-source models
-  - Can fall back between providers if needed
+- **Step 1 — Analyze & Detect**: `analyzeReference(rawInput)` detects the source type, recommends the best citation format, and rewrites the citation accordingly
+- **Step 2 — Format Switching**: `rewriteToFormat(rawInput, targetFormat)` converts between APA 7th, Chicago, Bahai convention, Religious, Descriptive, or Custom formats
+- **Step 3 — Locate Online**: `locateReferenceOnline(partialInput, sourceTypeHint)` searches Crossref, Google Books, and DeepSeek to find and format the reference automatically
+
+- **API Integration**: DeepSeek v4 (primary, OpenAI-compatible API) with Ollama (local fallback) and offline mock (development)
+  - Routes validation request through a priority-based provider chain
+  - Provider order: DeepSeek → Ollama → Local offline mock
+  - DeepSeek configured via `NEXT_PUBLIC_DEEPSEEK_API_KEY` and `NEXT_PUBLIC_DEEPSEEK_MODEL`
+  - Ollama configured via `NEXT_PUBLIC_OLLAMA_BASE_URL` and `NEXT_PUBLIC_OLLAMA_MODEL`
+  - Can fall back between providers automatically if one is unavailable
+  - Low temperature (0.1) for structured JSON output
 
 - **Source-Specific Validation Prompts**:
   - **Academic Sources Prompt** (book/journal/website): Validate APA 7th edition rules, extract authors/year/title/publisher/DOI/URL
@@ -589,57 +605,83 @@ Create `src/repositories/ReferenceRepository.ts`:
 ```
 
 ### Service Required
-Create `src/services/referenceService.ts`:
+`src/services/referenceService.ts` implements the full advisory pipeline:
 
+**New Types:**
 ```typescript
-// Reference validation and formatting service with multi-format support
-interface ValidationResult {
-  isValid: boolean;
-  formattedAPA: string;               // Citation in appropriate format
+interface CitationAdvisory {
+  detectedType: ReferenceEntity['sourceType'];
+  recommendedFormat: ReferenceEntity['citationFormat'];
+  confidence: number;                    // 0-1
+  formattedCitation: string;             // AI-rewritten citation
+  alternativeFormats?: {
+    format: ReferenceEntity['citationFormat'];
+    label: string;
+    citation: string;
+  }[];
+  warnings: string[];
+  rawAnalysis: string;                   // AI explanation
   structured: Partial<ReferenceEntity>;
-  errors: string[];
-  warnings?: string[];                // Non-blocking suggestions
 }
 
+interface CitationCandidate {
+  title: string;
+  authors: CitationAuthor[];
+  year: number | null;
+  publisher?: string;
+  doi?: string;
+  url?: string;
+  formattedCitation: string;
+  confidence: number;
+  sourceUrl: string;
+  source: string;                        // "crossref" | "google-books" | "deepseek"
+}
+
+interface ValidationResult {
+  isValid: boolean;
+  formattedAPA: string;
+  structured: Partial<ReferenceEntity>;
+  errors: string[];
+  warnings?: string[];
+}
+```
+
+**AI Provider Abstraction:**
+```typescript
+// Priority-based provider chain:
+const PROVIDERS = [
+  { name: 'deepseek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', priority: 1 },
+  { name: 'ollama', baseUrl: 'http://localhost:11434', model: 'llama3', priority: 2 },
+];
+// Fallback: DeepSeek → Ollama → Local offline mock
+```
+
+**Public Methods:**
+```typescript
 export class ReferenceService {
-  // Validate raw citation, auto-detect source type
+  // Step 1: Analyze raw input → detect type, recommend format, rewrite
+  async analyzeReference(rawInput: string): Promise<CitationAdvisory>
+  
+  // Step 2: Rewrite to a different citation format
+  async rewriteToFormat(
+    rawInput: string,
+    targetFormat: 'apa-7' | 'chicago' | 'bahai' | 'religious' | 'descriptive' | 'custom'
+  ): Promise<CitationAdvisory>
+  
+  // Step 3: Locate reference online (Crossref, Google Books, DeepSeek)
+  async locateReferenceOnline(
+    partialInput: string,
+    sourceTypeHint?: string
+  ): Promise<{ candidates: CitationCandidate[]; bestMatch: CitationCandidate | null; searchSource: string }>
+  
+  // Legacy methods (now delegate to analyzeReference)
   async validateAndFormatReference(rawCitation: string): Promise<ValidationResult>
-  
-  // Validate with explicit source type
-  async validateWithSourceType(
-    rawCitation: string,
-    sourceType: string
-  ): Promise<ValidationResult>
-  
-  // Check for duplicate (by DOI, formatted string, or spiritual concept name)
+  async validateWithSourceType(rawCitation: string, sourceType: string): Promise<ValidationResult>
   async checkDuplicate(citation: ReferenceEntity): Promise<ReferenceEntity | null>
-  
-  // Parse structured input and validate
-  async parseStructuredInput(data: Partial<ReferenceEntity>): Promise<ValidationResult>
-  
-  // Bahai-specific validation
   async validateBahaiText(textName: string, speaker?: string): Promise<ValidationResult>
-  
-  // Spiritual concept validation
-  async validateSpiritualConcept(
-    conceptName: string,
-    context?: string,
-    relatedConcepts?: string[]
-  ): Promise<ValidationResult>
-  
-  // Religious scripture validation
-  async validateScripture(
-    title: string,
-    bookChapterVerse: string
-  ): Promise<ValidationResult>
-  
-  // Oral tradition documentation
-  async validateOralTradition(
-    topic: string,
-    speaker?: string,
-    date?: Date,
-    transcribedBy?: string
-  ): Promise<ValidationResult>
+  async validateSpiritualConcept(conceptName: string, context?: string, relatedConcepts?: string[]): Promise<ValidationResult>
+  async validateScripture(title: string, bookChapterVerse: string): Promise<ValidationResult>
+  async validateOralTradition(topic: string, speaker?: string, date?: Date, transcribedBy?: string): Promise<ValidationResult>
 }
 ```
 
