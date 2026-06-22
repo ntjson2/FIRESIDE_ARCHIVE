@@ -34,6 +34,18 @@ export default function Navbar() {
               {(profile?.role === 'Admin' || profile?.role === 'SuperAdmin') && (
                 <>
                   <Link 
+                    href="/admin/firesides" 
+                    className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+                  >
+                    Firesides
+                  </Link>
+                  <Link 
+                    href="/admin/families" 
+                    className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+                  >
+                    Families
+                  </Link>
+                  <Link 
                     href="/admin/snippets" 
                     className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
                   >
@@ -44,6 +56,18 @@ export default function Navbar() {
                     className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
                   >
                     Deepenings
+                  </Link>
+                  <Link 
+                    href="/admin/references" 
+                    className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+                  >
+                    References
+                  </Link>
+                  <Link 
+                    href="/admin/tags" 
+                    className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+                  >
+                    Tags
                   </Link>
                 </>
               )}
