@@ -156,8 +156,8 @@ export default function AdminDeepeningsPage() {
                       <td className="p-4">
                         <span className="font-medium">{deepening.name}</span>
                         <p className="text-sm text-muted-foreground line-clamp-1 mt-1">
-                          {deepening.text.substring(0, 100)}
-                          {deepening.text.length > 100 ? '...' : ''}
+                          {deepening.text?.substring(0, 100) || ''}
+                          {(deepening.text?.length ?? 0) > 100 ? '...' : ''}
                         </p>
                       </td>
                       <td className="p-4">

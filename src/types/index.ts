@@ -72,6 +72,29 @@ export interface ContentReference {
   relationshipType?: 'cites' | 'illustrates' | 'derived-from' | 'contradicts' | 'extends';
 }
 
+export interface ParallelRefCandidate {
+  title: string;
+  authors?: CitationAuthor[];
+  year?: number;
+  publisher?: string;
+  url?: string;
+  doi?: string;
+  formattedCitation: string;
+  relevanceScore: number;        // 0-1 how well it supports the same point
+  relevanceExplanation: string;  // LLM's reasoning for the match
+  sourceOfSuggestion: 'existing-library' | 'crossref' | 'google-books' | 'llm-knowledge';
+}
+
+export interface ParallelRefResult {
+  urlAnalysis: {
+    thesis: string;
+    topics: string[];
+    confidence: number;
+  };
+  candidates: ParallelRefCandidate[];
+  existingLibraryMatches: ReferenceEntity[];
+}
+
 export interface TagEntity extends BaseEntity {
   name: string;
   count: number;

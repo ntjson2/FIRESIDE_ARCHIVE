@@ -144,7 +144,7 @@ export default function AdminSnippetsPage() {
                           {snippet.name}
                         </Link>
                         <p className="text-sm text-muted-foreground line-clamp-1 mt-1">
-                          {snippet.text.substring(0, 100)}...
+                          {snippet.text?.substring(0, 100) || ''}...
                         </p>
                       </td>
                       <td className="p-4">

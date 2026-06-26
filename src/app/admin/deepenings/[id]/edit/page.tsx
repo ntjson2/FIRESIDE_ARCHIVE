@@ -9,9 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
-import { ArrowLeft, Save, Plus, X, Trash2, BookOpen, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Save, Plus, X, Trash2, BookOpen, ExternalLink, Globe, Search, Loader } from 'lucide-react';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
+import { referenceService } from '@/services/referenceService';
 
 export default function EditDeepeningPage({ params }: { params: Promise<{ id: string }> }) {
   const { profile } = useAuth();
@@ -37,6 +38,11 @@ export default function EditDeepeningPage({ params }: { params: Promise<{ id: st
   const [newTagWeight, setNewTagWeight] = useState('1');
   const [newTagDistance, setNewTagDistance] = useState('0');
   const [tempTagNames, setTempTagNames] = useState<Record<string, string>>({});
+
+  // Parallel reference lookup
+  const [parallelUrl, setParallelUrl] = useState('');
+  const [parallelSearching, setParallelSearching] = useState(false);
+  const [parallelResult, setParallelResult] = useState<any>(null);
 
   useEffect(() => {
     if (profile && profile.role !== 'Admin' && profile.role !== 'SuperAdmin') {
@@ -188,6 +194,18 @@ export default function EditDeepeningPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  const handleFindParallel = async () => {
+    if (!parallelUrl.trim()) { alert('Please enter a URL'); return; }
+    setParallelSearching(true);
+    setParallelResult(null);
+    try {
+      const result = await referenceService.findParallelReferences(text, parallelUrl, name);
+      setParallelResult(result);
+    } catch (e) {
+      alert('Failed to search for parallel references: ' + String(e));
+    } finally { setParallelSearching(false); }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -321,6 +339,73 @@ export default function EditDeepeningPage({ params }: { params: Promise<{ id: st
             ) : (
               <p className="text-xs text-muted-foreground italic">No references linked yet. Click "Add Reference" to get started.</p>
             )}
+
+            {/* Parallel Reference Lookup */}
+            <div className="border-t border-border pt-4 space-y-3">
+              <Label className="flex items-center gap-2">
+                <Globe className="h-4 w-4" />
+                Find Parallel References
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  value={parallelUrl}
+                  onChange={(e) => setParallelUrl(e.target.value)}
+                  placeholder="Paste a URL to find references supporting the same point..."
+                  className="flex-1"
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleFindParallel(); } }}
+                />
+                <Button type="button" onClick={handleFindParallel} disabled={parallelSearching}>
+                  {parallelSearching ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                  {parallelSearching ? 'Searching...' : 'Find Parallel Ref'}
+                </Button>
+              </div>
+
+              {parallelResult && (
+                <div className="space-y-3 mt-3">
+                  {parallelResult.urlAnalysis?.thesis && (
+                    <div className="p-3 rounded-md bg-primary/5 border border-primary/20">
+                      <p className="text-sm font-medium text-primary">URL Analysis</p>
+                      <p className="text-sm text-muted-foreground mt-1">{parallelResult.urlAnalysis.thesis}</p>
+                      {parallelResult.urlAnalysis.topics?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {parallelResult.urlAnalysis.topics.map((t: string, i: number) => (
+                            <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">{t}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {parallelResult.candidates?.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-foreground">Suggested References ({parallelResult.candidates.length})</p>
+                      {parallelResult.candidates.map((c: any, i: number) => (
+                        <div key={i} className="p-3 rounded-md bg-secondary/10 border border-secondary/20">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                {Math.round(c.relevanceScore * 100)}% match
+                              </span>
+                              <span className="text-sm font-medium">{c.title}</span>
+                            </div>
+                            {c.authors?.length > 0 && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {c.authors.map((a: any) => `${a.lastName}, ${a.initials}`).join('; ')}
+                                {c.year ? ` (${c.year})` : ''}{c.publisher ? ` — ${c.publisher}` : ''}
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1 italic">{c.relevanceExplanation}</p>
+                            {c.formattedCitation && (
+                              <p className="text-xs text-muted-foreground mt-1 font-mono bg-muted p-2 rounded">{c.formattedCitation}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Tags */}

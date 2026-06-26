@@ -162,7 +162,7 @@ FiresideFamily  (e.g. "General Firesides", "Youth Firesides")
 ### Reference System
 
 References support multiple **source types** with format-specific validation:
-- **Academic:** book, journal, website (APA 7th edition)
+- **Academic:** book, journal, website (APA 7th edition, Chicago Style)
 - **Bahai:** bahai-text (e.g., Kitab-i-Aqdas, Hidden Words)
 - **Religious:** religious-scripture (Quran, Bible with book:chapter:verse)
 - **Conceptual:** spiritual-concept (Bahai principles with metadata)

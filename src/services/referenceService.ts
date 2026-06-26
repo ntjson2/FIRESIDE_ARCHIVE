@@ -566,6 +566,103 @@ Search the web or use your knowledge to identify the source. Return ONLY valid J
     };
   }
 
+  /** Step 4: Find parallel references from a URL that support the same point as the snippet/deepening */
+  async findParallelReferences(
+    snippetText: string,
+    targetUrl: string,
+    snippetTitle?: string
+  ): Promise<{
+    urlAnalysis: { thesis: string; topics: string[]; confidence: number };
+    candidates: {
+      title: string;
+      authors?: { lastName: string; initials: string }[];
+      year?: number;
+      publisher?: string;
+      url?: string;
+      doi?: string;
+      formattedCitation: string;
+      relevanceScore: number;
+      relevanceExplanation: string;
+      sourceOfSuggestion: string;
+    }[];
+    existingLibraryMatches: ReferenceEntity[];
+    formattedCitations: { chicago?: string; apa?: string };
+  }> {
+    const prompt = `You are a citation research assistant for the Fireside Archive, a Bahá'í teaching reference system.
+
+TASK: Given a snippet of teaching content and a URL, find references that support the same point.
+
+SNIPPET TITLE: ${snippetTitle || '(unknown)'}
+SNIPPET CONTENT: "${snippetText.substring(0, 500)}${snippetText.length > 500 ? '...' : ''}"
+TARGET URL: "${targetUrl}"
+
+DO THE FOLLOWING:
+1. Analyze what thesis or key point the URL is making
+2. Identify topics covered
+3. Find 3-5 references (scholarly, Bahá'í texts, or spiritual concepts) that could support the same point
+4. Score relevance 0-1 (1 = directly supports the exact same point)
+5. Explain WHY each reference is relevant
+
+Return ONLY valid JSON (no markdown, no code blocks):
+{
+  "urlAnalysis": {
+    "thesis": "The main argument or point made by the URL (1-2 sentences)",
+    "topics": ["topic1", "topic2", "topic3"],
+    "confidence": 0.9
+  },
+  "candidates": [
+    {
+      "title": "Reference title",
+      "authors": [{"lastName": "Smith", "initials": "J.M."}],
+      "year": 2020,
+      "publisher": "Publisher Name",
+      "url": "https://...",
+      "doi": "",
+      "formattedCitation": "Full Chicago Style citation",
+      "relevanceScore": 0.85,
+      "relevanceExplanation": "Two sentences explaining HOW this reference supports the same point as the URL",
+      "sourceOfSuggestion": "llm-knowledge"
+    }
+  ],
+  "formattedCitations": {
+    "chicago": "Chicago formatted citation of the best match",
+    "apa": "APA 7 formatted citation of the best match"
+  }
+}`;
+
+    try {
+      const response = await this.callAI(prompt, 'parallel-ref');
+      const parsed = JSON.parse(this.cleanJSON(response));
+
+      return {
+        urlAnalysis: parsed.urlAnalysis || { thesis: '', topics: [], confidence: 0 },
+        candidates: (parsed.candidates || []).map((c: any) => ({
+          title: c.title || 'Unknown',
+          authors: c.authors || [],
+          year: c.year || null,
+          publisher: c.publisher || '',
+          url: c.url || '',
+          doi: c.doi || '',
+          formattedCitation: c.formattedCitation || '',
+          relevanceScore: c.relevanceScore || 0,
+          relevanceExplanation: c.relevanceExplanation || '',
+          sourceOfSuggestion: c.sourceOfSuggestion || 'llm-knowledge',
+        })),
+        existingLibraryMatches: [],
+        formattedCitations: parsed.formattedCitations || {},
+      };
+    } catch (error) {
+      console.error('Parallel reference lookup failed:', error);
+      // Return local fallback
+      return {
+        urlAnalysis: { thesis: 'Could not analyze URL', topics: [], confidence: 0 },
+        candidates: [],
+        existingLibraryMatches: [],
+        formattedCitations: {},
+      };
+    }
+  }
+
   // ─── Utilities ──────────────────────────────────────────────────────────
 
   private cleanJSON(text: string): string {

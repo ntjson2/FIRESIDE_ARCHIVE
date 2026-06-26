@@ -1,0 +1,10 @@
+start -- agent loop: 
+tasks:
+1.) There are two 'Firesides' nav bar links, should only be one. Once in there there be a standard way to navigate to manage firesides based on user roles. 
+2.) when viewing a snippet '/snippets/32B6AWNoCufW9HSofCEh', I want to see their associated references and tags along with edit and delete (roles permitting)
+3.) When I click a deepening to view nothing happens when at admin/deepenings
+
+
+
+todo --
+3.) I can't create an outline. I want to be able to drag and drop entire firesides, snippets, groups of snippets or deepings, from left to right onto my outline. I
