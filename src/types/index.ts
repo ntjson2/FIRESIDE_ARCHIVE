@@ -173,3 +173,34 @@ export interface Outline extends BaseEntity {
   markdown?: string;
   isPublic: boolean;
 }
+
+// ─── PDF Integration Types ───────────────────────────────────────────────────
+
+export type ChunkType = 'text' | 'image' | 'heading';
+
+export interface ParsedChunk {
+  localId: string;
+  type: ChunkType;
+  order: number;
+  pageNumber: number;
+  content: string;
+  imageUrl?: string;
+  imageBase64?: string;
+  firebaseStoragePath?: string;
+  notes: string;
+  action: 'keep' | 'delete' | 'deepening' | 'skip';
+  editedContent?: string;
+  references?: ContentReference[];
+  marks: { type: string; note: string }[];
+  originalContent?: string;
+  scanVersion: number;
+  scanHistory: { content: string; type: ChunkType; timestamp: number }[];
+}
+
+export interface FiresideBatch {
+  firesideName: string;
+  firesideIndex: number;
+  chunks: ParsedChunk[];
+  status: 'pending' | 'approved' | 'skipped';
+  targetFamilyId?: string;
+}

@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
-import { snippetRepository, firesideRepository, deepeningRepository, tagRepository } from '@/repositories';
-import { Snippet, Fireside, Deepening, TagEntity } from '@/types';
+import { snippetRepository, firesideRepository, deepeningRepository, tagRepository, referenceRepository } from '@/repositories';
+import { Snippet, Fireside, Deepening, TagEntity, ReferenceEntity } from '@/types';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Tag, FileText, Hash, Eye } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { ArrowLeft, Tag, FileText, Eye, BookOpen, Edit3, Trash2 } from 'lucide-react';
 
 export default function SnippetDetailPage() {
+  const { profile } = useAuth();
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -18,7 +20,10 @@ export default function SnippetDetailPage() {
   const [fireside, setFireside] = useState<Fireside | null>(null);
   const [deepenings, setDeepenings] = useState<Deepening[]>([]);
   const [tags, setTags] = useState<Record<string, TagEntity>>({});
+  const [references, setReferences] = useState<ReferenceEntity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const isAdmin = profile?.role === 'Admin' || profile?.role === 'SuperAdmin';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -53,6 +58,13 @@ export default function SnippetDetailPage() {
           }
         }
         setTags(tagMap);
+
+        // Fetch linked references
+        const allRefs = await referenceRepository.findAll();
+        const linkedRefs = allRefs.filter(ref =>
+          ref.linkedItems?.some(li => li.itemId === id && li.itemType === 'snippet')
+        );
+        setReferences(linkedRefs);
       } catch (error) {
         console.error('Error fetching snippet:', error);
       } finally {
@@ -62,6 +74,19 @@ export default function SnippetDetailPage() {
 
     fetchData();
   }, [id, router]);
+
+  const handleDelete = async () => {
+    if (!confirm(`Delete "${snippet?.name}"? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      await snippetRepository.delete(id);
+      router.push('/firesides');
+    } catch (e) {
+      console.error(e);
+      alert('Failed to delete snippet');
+      setDeleting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -159,6 +184,47 @@ export default function SnippetDetailPage() {
           <ReactMarkdown>{snippet.text}</ReactMarkdown>
         </div>
       </div>
+
+      {/* References */}
+      {references.length > 0 && (
+        <div className="bg-card rounded-lg border border-border p-4">
+          <h2 className="text-lg font-semibold mb-3 flex items-center">
+            <BookOpen className="mr-2 h-5 w-5" />
+            References ({references.length})
+          </h2>
+          <div className="space-y-2">
+            {references.map((ref) => (
+              <div key={ref.id} className="p-3 rounded-md bg-secondary/10 border border-secondary/20">
+                <div className="font-medium text-sm">{ref.title}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {ref.sourceType} • {ref.citationFormat}
+                </div>
+                {ref.formattedAPA && (
+                  <div className="text-xs text-muted-foreground mt-1 italic">
+                    {ref.formattedAPA}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Admin Actions */}
+      {isAdmin && (
+        <div className="flex gap-2">
+          <Link href={`/admin/snippets/${id}/edit`}>
+            <Button variant="outline" size="sm">
+              <Edit3 className="mr-2 h-4 w-4" />
+              Edit Snippet
+            </Button>
+          </Link>
+          <Button variant="outline" size="sm" onClick={handleDelete} disabled={deleting} className="text-destructive hover:text-destructive">
+            <Trash2 className="mr-2 h-4 w-4" />
+            {deleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </div>
+      )}
 
       {/* Deepenings */}
       {deepenings.length > 0 && (

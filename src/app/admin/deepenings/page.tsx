@@ -154,7 +154,9 @@ export default function AdminDeepeningsPage() {
                       className="border-t border-border hover:bg-muted/30 transition-colors"
                     >
                       <td className="p-4">
-                        <span className="font-medium">{deepening.name}</span>
+                        <Link href={`/admin/deepenings/${deepening.id}/edit`} className="font-medium hover:text-primary hover:underline">
+                          {deepening.name}
+                        </Link>
                         <p className="text-sm text-muted-foreground line-clamp-1 mt-1">
                           {deepening.text?.substring(0, 100) || ''}
                           {(deepening.text?.length ?? 0) > 100 ? '...' : ''}

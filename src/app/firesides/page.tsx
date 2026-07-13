@@ -6,11 +6,14 @@ import { firesideRepository, firesideFamilyRepository } from '@/repositories';
 import { Fireside, FiresideFamily } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Calendar, Search } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { Plus, Calendar, Search, Settings } from 'lucide-react';
 
 export default function FiresidesPage() {
+  const { profile } = useAuth();
   const [firesides, setFiresides] = useState<Fireside[]>([]);
   const [families, setFamilies] = useState<FiresideFamily[]>([]);
+  const isAdmin = profile?.role === 'Admin' || profile?.role === 'SuperAdmin';
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFamily, setSelectedFamily] = useState<string>('all');
@@ -85,12 +88,24 @@ export default function FiresidesPage() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Firesides</h1>
           <p className="text-muted-foreground">Browse and search your fireside archive.</p>
         </div>
-        <Link href="/admin/firesides/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Fireside
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          {isAdmin && (
+            <Link href="/admin/firesides">
+              <Button variant="outline">
+                <Settings className="mr-2 h-4 w-4" />
+                Manage Firesides
+              </Button>
+            </Link>
+          )}
+          {isAdmin && (
+            <Link href="/admin/firesides/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                New Fireside
+              </Button>
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Filters and Search */}
