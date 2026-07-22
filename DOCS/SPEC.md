@@ -1426,10 +1426,115 @@ Response:
 
 ---
 
-## 11. Non-Goals
+## 13. Fireside Integration Pipeline
+
+### 13.1 Overview
+The Fireside Integration Pipeline (`/admin/fireside-integration`) automates the assimilation of raw scanned fireside PDFs into the archive. It uses **DeepSeek Reasoner v4** for snippet extraction and classification, and **Gemini Flash** for image labeling and bounding-box cropping.
+
+The pipeline is driven by a `guide.md` file uploaded alongside raw PDFs that defines:
+- Target Fireside Family
+- PDF file list
+- Transition table: where each universal fireside begins (PDF filename + page number)
+- LLM instructions for extraction behavior and special handling notes
+
+### 13.2 Universal Fireside Categories
+All extracted content is automatically classified into one of 7 universal fireside categories:
+
+1. **Why Life**
+2. **The Proofs for Jesus Christ**
+3. **The Proofs for Baha'U'llah**
+4. **The Covenant**
+5. **The Proofs for the Establisher**
+6. **The Great Pyramid of Giza**
+7. **The Lamb's Explanations and Commentaries on The Book of Revelations**
+
+Every snippet MUST be classified into one of these categories. `UNCATEGORIZED` is reserved for extreme anomalies (unreadable text, blank pages, non-fireside content) and should be used in less than 1% of cases.
+
+### 13.3 guide.md Format
+```
+# Fireside Family: General Firesides
+
+## Fireside Transitions
+| # | Fireside | PDF | Page |
+|---|----------|-----|------|
+| 1 | Why Life | raw-collection-1.pdf | 1 |
+| 2 | The Proofs for Jesus Christ | raw-collection-1.pdf | 34 |
+| 3 | The Proofs for Baha'U'llah | raw-collection-2.pdf | 20 |
+| 4 | The Covenant | raw-collection-4.pdf | 3 |
+
+## PDF Files
+- raw-collection-1.pdf
+- raw-collection-2.pdf
+- raw-collection-3.pdf
+- raw-collection-4.pdf
+
+## LLM Instructions
+These are scanned fireside collections. Use the transition table above.
+```
+
+**Note:** A PDF can be uploaded and processed even if it doesn't appear in the transition table — it belongs to the current fireside that spans across it. The transition table only marks where a new fireside *starts*.
+
+### 13.4 Processing Flow
+```
+Admin uploads guide.md + raw PDFs
+  → System parses guide.md, creates IntegrationJob in Firestore
+  → Builds processing plan (auto-computes page ranges across PDF chains)
+  → For each plan entry, renders PDF pages to canvas (pdf.js)
+  → Sends page images to DeepSeek Reasoner v4 for snippet extraction
+  → LLM classifies all snippets to the current fireside category
+  → LLM identifies image regions with bounding boxes
+  → Crops images via Canvas API → uploads to Firebase Storage
+  → Sends cropped images to Gemini Flash for semantic labeling
+  → Saves checkpoint after each plan entry (resume-safe)
+  → Marks job as IN-REVIEW for admin review
+  → Admin reviews, edits, changes statuses per snippet
+  → Approved snippets batch-insert into Firestore
+```
+
+### 13.5 Snippet Statuses
+
+| Status | Meaning |
+|---|---|
+| `IN-REVIEW` | Extracted, awaiting admin review |
+| `APPROVED` | Reviewed and approved for Firestore insertion |
+| `REJECTED` | Rejected during review (not inserted) |
+| `MERGED` | Combined with another snippet |
+| `DEEPENING` | Marked as a deepening (explanatory research) |
+| `UNDER-RESEARCH` | Flagged for future investigation |
+
+### 13.6 Checkpoint & Resume
+Every processing step saves a checkpoint to the `integrationJobs` Firestore collection. If the pipeline is interrupted (network failure, LLM API timeout, browser close), the page auto-detects the pending job on next load and offers to resume from the last checkpoint. No work is lost.
+
+### 13.7 Revert
+Admin can revert individual category results or entire jobs. Reverting deletes Firestore entries and Firebase Storage references. A confirmation modal with counts warns before permanent deletion.
+
+### 13.8 LLM Annotation
+DeepSeek Reasoner flags questionable extracted text with annotation types:
+- `grammar` — awkward phrasing
+- `unclear-word` — single word that appears wrong (LLM provides best guess)
+- `ocr-artifact` — garbled characters from scan artifacts
+- `double-column-mix` — text from two columns incorrectly merged
+
+Flagged snippets display a warning badge in the review UI with the LLM's note.
+
+### 13.9 Data Model (abbreviated)
+- **`IntegrationJob`** — top-level job: guide path, family, PDF list, transitions, processing plan, checkpoints, logs
+- **`IntegratedSnippet`** — extracted text: content, category, confidence, status, annotations, source PDF/page
+- **`IntegratedImage`** — cropped image: bounds, Storage path, Gemini label, category, status
+
+### 13.10 Environment Variables
+```
+NEXT_PUBLIC_DEEPSEEK_API_KEY          # DeepSeek API key for Reasoner v4
+NEXT_PUBLIC_DEEPSEEK_REASONER_MODEL   # deepseek-reasoner (or fallback to deepseek-chat)
+NEXT_PUBLIC_GEMINI_API_KEY            # Google AI Studio API key for Gemini Flash
+```
+
+---
+
+## 14. Non-Goals
 - No social network features
 - No AI-generated doctrine
 - No proprietary content lock-in
 
-## 12. Guiding Principle
+## 15. Guiding Principle
 > **The system exists to support teaching and consultation, not to replace them.**

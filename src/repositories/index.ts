@@ -11,3 +11,4 @@ export { ReferenceRepository, referenceRepository } from './ReferenceRepository'
 import { TagRepository as TagRepositoryClass } from './TagRepository';
 export { TagRepositoryClass as TagRepository };
 export const tagRepository = new TagRepositoryClass();
+export { IntegrationJobRepository, integrationJobRepository } from './IntegrationJobRepository';

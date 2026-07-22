@@ -204,3 +204,103 @@ export interface FiresideBatch {
   status: 'pending' | 'approved' | 'skipped';
   targetFamilyId?: string;
 }
+
+// ─── Fireside Integration Pipeline Types ──────────────────────────────────────
+
+export type SnippetStatus =
+  | 'IN-REVIEW'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'MERGED'
+  | 'DEEPENING'
+  | 'UNDER-RESEARCH';
+
+export type UniversalFiresideCategory =
+  | 'Why Life'
+  | 'The Proofs for Jesus Christ'
+  | 'The Proofs for BahaUllah'
+  | 'The Covenant'
+  | 'The Proofs for the Establisher'
+  | 'The Great Pyramid of Giza'
+  | 'The Lambs Explanations and Commentaries on The Book of Revelations'
+  | 'UNCATEGORIZED';
+
+export const UNIVERSAL_FIRESIDE_CATEGORIES: UniversalFiresideCategory[] = [
+  'Why Life',
+  'The Proofs for Jesus Christ',
+  'The Proofs for BahaUllah',
+  'The Covenant',
+  'The Proofs for the Establisher',
+  'The Great Pyramid of Giza',
+  'The Lambs Explanations and Commentaries on The Book of Revelations',
+];
+
+export type AnnotationType = 'grammar' | 'unclear-word' | 'ocr-artifact' | 'double-column-mix' | 'other';
+
+export interface IntegratedSnippet {
+  localId: string;
+  text: string;
+  order: number;
+  status: SnippetStatus;
+  category: UniversalFiresideCategory;
+  categoryConfidence: number;
+  isTransitionBoundary: boolean;
+  transitionConfidence?: number;
+  pageNumber: number;
+  sourcePdf: string;
+  annotation?: string;
+  annotationType?: AnnotationType;
+}
+
+export interface IntegratedImage {
+  localId: string;
+  cropBounds: { x: number; y: number; width: number; height: number };
+  fullPageImageUrl: string;
+  croppedImageUrl?: string;
+  firebaseStoragePath: string;
+  geminiLabel: string;
+  pageNumber: number;
+  sourcePdf: string;
+  order: number;
+  status: SnippetStatus;
+  category: UniversalFiresideCategory;
+  categoryConfidence: number;
+  annotation?: string;
+}
+
+export interface TransitionEntry {
+  firesideNumber: number;
+  category: UniversalFiresideCategory;
+  pdfFilename: string;
+  pageNumber: number;
+}
+
+export interface PDFProcessingPlan {
+  category: UniversalFiresideCategory;
+  pdfFilename: string;
+  startPage: number;
+  endPage: number; // computed: start of next fireside - 1, or last page of PDF chain
+}
+
+export interface IntegrationJob extends BaseEntity {
+  guideFilePath: string;
+  familyId: string;
+  familyName: string;
+  pdfFiles: string[];
+  transitions: TransitionEntry[];
+  processingPlan: PDFProcessingPlan[];
+  uploadedBy: string;
+  processedBy: string;
+  status: 'PENDING' | 'PROCESSING' | 'IN-REVIEW' | 'COMPLETE' | 'ERROR';
+  currentPlanIndex: number;
+  currentPage: number;
+  totalPages: number;
+  categoryResults: {
+    [category: string]: {
+      snippets: IntegratedSnippet[];
+      images: IntegratedImage[];
+    }
+  };
+  logEntries: { timestamp: Timestamp; level: 'info' | 'warning' | 'error'; message: string }[];
+  errorAt?: { planIndex: number; page: number; step: string; message: string };
+}

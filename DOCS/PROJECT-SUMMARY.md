@@ -206,12 +206,23 @@ Relationship types for linking references to content: `cites`, `illustrates`, `d
 
 ### References & Citations
 - Global citation registry with deduplication
-- Multi-format support (APA 7, Bahai, religious, descriptive)
+- Multi-format support (APA 7, Chicago, Bahai, religious, descriptive)
 - LLM-powered validation with per-source-type system prompts
 - Verification status badges (✓ valid | ✗ invalid | ⏳ pending | 📡 offline-check)
 - Batch verification and offline fallback
 - Reverse lookup: "where is this reference used?"
-- Export in APA and BibTeX formats
+- Export in APA, Chicago, and BibTeX formats
+- URL-based parallel reference lookup via DeepSeek
+
+### Fireside Integration Pipeline
+- Batch import raw scanned fireside PDFs via `/admin/fireside-integration`
+- `guide.md` driven: transition table, PDF list, LLM instructions
+- DeepSeek Reasoner v4 for snippet extraction and classification into 7 universal categories
+- Gemini Flash for image bounding-box cropping and semantic labeling
+- Checkpoint/resume: never lose progress on interruptions
+- Per-category revert with full Firestore + Storage cleanup
+- LLM annotations for questionable text (grammar, unclear words, OCR artifacts)
+- Snippet statuses: IN-REVIEW, APPROVED, REJECTED, MERGED, DEEPENING, UNDER-RESEARCH
 
 ### Outline Editor (In Progress)
 - Split-pane interface (Library + Canvas)

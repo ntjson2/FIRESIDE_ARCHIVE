@@ -1,3 +1,60 @@
+
+Fireside transitions can be defined in guide.md (change guide.txt to guide.md) at the top, assuming natural sequence.
+Example
+"
+# Fireside transitions:
+raw-fireside-collection-1.pdf, pg 34
+raw-fireside-collection-2.pdf, pg 20
+raw-fireside-collection-4.pdf, pg 3
+...
+"
+(Notice the skip of raw-fireside-collection-3)
+
+
+start -- adjustments
+We will be loading an entire fireside family not breaking them down into separate fireside in the guide.txt.
+The LLM defines the Firesides and where they fit.
+A.) There are only these Universally:
+1.) Why life  
+2.) The Proofs for Jesus Christ
+3.) The Proofs for Baha 'U' Allah
+4.) The Covenant
+5.) The Proofs for the Establisher
+6.) The Great Pyramid of Giza
+7.) The Lamb's Explanations and Commentaries on The Book of Revelations
+
+In theory, as a raw fireside PDF group is scanned, each snippet/media should fall into one of these categories naturally. Most of the time there will be an obvious change in chapters. If not, note this and move on.
+
+
+B.) SnippetStatus = 'IN-REVIEW' | 'APPROVED' | 'REJECTED' | 'MERGED'
+Add 'DEEPENING' AND 'UNDER-RESEARCH'
+
+
+
+c.) Make a firestore entry on WHO is uploading and doing this process.
+
+d.) Make a revert function where a user can delete whole sections or entire iterations of processed raw firesides. This would include firestore and storage refs.
+
+
+e.) Have a note attached to a snippet during the processing phase if there is a question (wrong grammar? questionalble word?). The LLM should do it's best in extracting the context if it can't understand exactly the text.
+
+
+Revise analysis.
+-----------------------------
+
+start -- agent loop:
+1.) We need a page for the assimilation of the raw firesides into the system.
+2.) The 'loading' raw PDFs will be in the public/LOADING folder by an 'upload' button. The must be referenced by a 'guide.txt' file (uploaded as well). This file shows the sequence of raw pdfs in their order as well as any notes or specifications for the LLM to read and fireside family name. 
+3.)  Once loaded the system grabs the raw pdsf and guide.txt file, deepseek reasoner v4 displays the progress on the webpage and logs to a log file (public/LOGS/loading)
+4.) Any errors results in logging, displaying and recording in firestore where it got stuck for to continue later.
+5.) Each 30 to 50 word Fireside snippet is initially set to 'IN-REVIEW'. Same with each image cropped. Images/media should be saved in Firebase storage and referenced. Images need to be correctly idenified (Gemini Flash?) and cropped by a bounding box and assembled in order in relation to the snippets.
+
+
+Give concrete plans this page (Fireside_integration) and framework
+
+
+
+
 start -- agent loop: 
 tasks:
 1.) There are two 'Firesides' nav bar links, should only be one. Once in t there there be a standard way to navigate to manage firesides based on user roles. 
