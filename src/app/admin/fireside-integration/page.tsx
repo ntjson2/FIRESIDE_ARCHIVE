@@ -282,18 +282,27 @@ These are scanned fireside collections. Use the transition table above.`;
       </div>
 
       {/* Guidance Banner */}
-      <details className="bg-card rounded-lg border border-border p-4">
+      <details className="bg-card rounded-lg border border-border p-4" open>
         <summary className="cursor-pointer font-semibold text-sm flex items-center gap-2">
           <Info className="h-4 w-4 text-primary" />
           Getting Started with the Integration Pipeline
         </summary>
         <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-          <p><strong>1. Select a Fireside Family</strong> — Choose which family this collection belongs to (<a href="/admin/families" className="text-primary underline" target="_blank">create families here</a>).</p>
-          <p><strong>2. Upload guide.md</strong> — Defines PDF list, transition table, and LLM instructions. <button className="text-primary underline" onClick={() => setShowGuide(!showGuide)}>View template</button>.</p>
-          <p><strong>3. Upload raw PDFs</strong> — All PDF files referenced in the guide.md.</p>
+          <p><strong>1. Select a Fireside Family</strong> — Choose which family this collection belongs to (<a href="/admin/families" className="text-primary underline" target="_blank">create families via Admin → Fireside Families</a>).</p>
+          <p><strong>2. Upload guide.md</strong> — Defines PDF list, fireside transition boundaries, and LLM instructions. <button className="text-primary underline" onClick={() => setShowGuide(!showGuide)}>View template</button>.</p>
+          <p><strong>3. Upload raw PDFs</strong> — All scanned PDF files referenced in the guide.md. Can be image-based or text-based.</p>
           <p><strong>4. Parse Guide & Create Job</strong> — Validates the guide and creates a checkpoint in Firestore.</p>
           <p><strong>5. Start Processing</strong> — DeepSeek Reasoner extracts and classifies snippets; Gemini Flash labels images.</p>
           <p><strong>6. Review & Approve</strong> — Expand categories, edit snippets, change statuses, then approve.</p>
+        </div>
+        <div className="mt-4 border-t border-border pt-3">
+          <p className="font-semibold text-sm mb-2 flex items-center gap-1"><HelpCircle className="h-3 w-3" /> FAQ</p>
+          <div className="space-y-2 text-xs text-muted-foreground">
+            <p><strong>Q: How are fireside boundaries determined?</strong><br/>A: You define them in guide.md's transition table (PDF + page number). The system auto-computes page ranges between transitions.</p>
+            <p><strong>Q: Can I resume if the browser closes?</strong><br/>A: Yes. Every step saves a checkpoint to Firestore. Reopen the page and it auto-detects the pending job.</p>
+            <p><strong>Q: How do I undo a mistake?</strong><br/>A: Use "Revert" per category or "Revert Entire Job" on the status bar. This cleans up Firestore + Storage.</p>
+            <p><strong>Q: What if a PDF spans multiple firesides?</strong><br/>A: A PDF not listed in the transition table belongs to the current fireside. Only transition points are listed — the system handles the rest.</p>
+          </div>
           {showGuide && (
             <div className="mt-3 bg-muted p-3 rounded-md font-mono text-xs relative">
               <button className="absolute top-2 right-2 text-muted-foreground hover:text-foreground" onClick={() => setShowGuide(false)}><X className="h-4 w-4" /></button>

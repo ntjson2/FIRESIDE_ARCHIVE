@@ -33,7 +33,7 @@ export default function NewFamilyPage() {
     setSaving(true);
     try {
       const factory = new FiresideFamilyFactory();
-      const family = factory.create({ uid: name.trim().toLowerCase().replace(/\s+/g, '-'), name: name.trim(), description });
+      const family = factory.create({ uid: name.trim().toLowerCase().replace(/\s+/g, '-'), name: name.trim(), description: description || 'No description' });
       await firesideFamilyRepository.save(family);
       router.push('/admin/families');
     } catch (error) {

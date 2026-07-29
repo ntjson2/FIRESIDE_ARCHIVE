@@ -93,6 +93,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     
+    // IntegrationJobs collection (pipeline)
+    match /integrationJobs/{jobId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+    
     // AuditLog collection (future)
     match /auditLog/{logId} {
       allow read: if isAdmin();
