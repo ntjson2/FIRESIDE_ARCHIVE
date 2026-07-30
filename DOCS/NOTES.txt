@@ -1,4 +1,11 @@
 
+start -- 
+Build in a feature so that when loading in Fireside Integration Pipeline firesides, we can do batches then continue.
+For example, if we load in 2 pdfs, the system notes how far they got according to guide.md - so if the first two contain firesides 1, 2 3 and 1/2 of part 4, save that to the system state for prep of the next upload for continuation. This also applied to deletion: If two are uploaded and 1 or 2 of the pdfs is corrupt or is not read well, give us the ability to redo that particular pdf upload, making sure to clean up old data. 
+
+
+
+
 Fireside transitions can be defined in guide.md (change guide.txt to guide.md) at the top, assuming natural sequence.
 Example
 "

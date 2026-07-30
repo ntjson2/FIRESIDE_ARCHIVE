@@ -101,6 +101,7 @@ export default function FiresideIntegrationPage() {
       currentPage: job.currentPage || 0,
       totalPages: job.totalPages || 0,
       categoryResults: job.categoryResults || {},
+      processedPdfs: job.processedPdfs || {},
       logEntries: job.logEntries || [],
     });
       const created = await integrationJobRepository.findById(jobId);
@@ -400,6 +401,74 @@ These are scanned fireside collections. Use the transition table above.`;
               </div>
             </div>
           </div>
+
+          {/* PDF Processing Status Table */}
+          {currentJob.pdfFiles && currentJob.pdfFiles.length > 0 && (
+            <div className="bg-card rounded-lg border border-border p-4">
+              <h3 className="font-semibold mb-3">PDF Processing Status</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-left text-muted-foreground">
+                    <tr>
+                      <th className="pb-2 font-medium">PDF File</th>
+                      <th className="pb-2 font-medium">Status</th>
+                      <th className="pb-2 font-medium">Pages</th>
+                      <th className="pb-2 font-medium">Firesides Contributed</th>
+                      <th className="pb-2 font-medium text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentJob.pdfFiles.map((pdfName: string) => {
+                      const status = currentJob.processedPdfs?.[pdfName];
+                      const isComplete = status?.status === 'complete';
+                      const isError = status?.status === 'error';
+                      const isPartial = status?.status === 'partial';
+                      return (
+                        <tr key={pdfName} className="border-t border-border">
+                          <td className="py-2 font-mono text-xs">{pdfName}</td>
+                          <td className="py-2">
+                            {isComplete ? (
+                              <span className="inline-flex items-center gap-1 text-green-400"><CheckCircle className="h-3 w-3" /> Complete</span>
+                            ) : isError ? (
+                              <span className="inline-flex items-center gap-1 text-red-400"><AlertCircle className="h-3 w-3" /> Error</span>
+                            ) : isPartial ? (
+                              <span className="inline-flex items-center gap-1 text-yellow-400"><Clock className="h-3 w-3" /> Partial</span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-muted-foreground"><Clock className="h-3 w-3" /> Pending</span>
+                            )}
+                          </td>
+                          <td className="py-2 text-muted-foreground">
+                            {status ? `${status.pagesProcessed}/${status.totalPages}` : '—'}
+                          </td>
+                          <td className="py-2 text-muted-foreground text-xs">
+                            {status?.firesidesContributed?.join(', ') || '—'}
+                          </td>
+                          <td className="py-2 text-right">
+                            {status && !isComplete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-primary hover:text-primary"
+                                onClick={async () => {
+                                  if (!confirm(`Reprocess ${pdfName}? All existing data from this PDF will be deleted first.`)) return;
+                                  await firesideIntegrationService.cleanupPdfResults(currentJob.id, pdfName);
+                                  const refreshed = await integrationJobRepository.findById(currentJob.id);
+                                  if (refreshed) setCurrentJob(refreshed);
+                                  handleStartProcessing();
+                                }}
+                              >
+                                <RotateCcw className="mr-1 h-3 w-3" /> Redo
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Category Results */}
           <div className="space-y-3">

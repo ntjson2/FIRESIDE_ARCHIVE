@@ -301,6 +301,14 @@ export interface IntegrationJob extends BaseEntity {
       images: IntegratedImage[];
     }
   };
+  processedPdfs: {
+    [pdfFilename: string]: {
+      status: 'complete' | 'partial' | 'error' | 'pending';
+      pagesProcessed: number;
+      totalPages: number;
+      firesidesContributed: string[];
+    }
+  };
   logEntries: { timestamp: Timestamp; level: 'info' | 'warning' | 'error'; message: string }[];
   errorAt?: { planIndex: number; page: number; step: string; message: string };
 }

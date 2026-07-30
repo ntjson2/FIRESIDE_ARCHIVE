@@ -276,6 +276,50 @@ Return ONLY valid JSON:
     await integrationJobRepository.update(jobId, updates);
   }
 
+  // ─── PDF Cleanup ────────────────────────────────────────────────────────
+
+  /** Clean up all results from a specific PDF so it can be re-processed */
+  async cleanupPdfResults(jobId: string, pdfFilename: string): Promise<void> {
+    const job = await integrationJobRepository.findById(jobId);
+    if (!job) return;
+
+    // Remove snippets and images from this PDF across all categories
+    const cleanedResults: typeof job.categoryResults = {};
+    let removedSnippets = 0;
+    let removedImages = 0;
+
+    for (const [cat, data] of Object.entries(job.categoryResults || {})) {
+      const keptSnippets = (data.snippets || []).filter(s => {
+        if (s.sourcePdf === pdfFilename) { removedSnippets++; return false; }
+        return true;
+      });
+      const keptImages = (data.images || []).filter(img => {
+        if (img.sourcePdf === pdfFilename) { removedImages++; return false; }
+        return true;
+      });
+      if (keptSnippets.length > 0 || keptImages.length > 0) {
+        cleanedResults[cat] = { snippets: keptSnippets, images: keptImages };
+      }
+    }
+
+    // Remove PDF from processedPdfs
+    const cleanedPdfs = { ...(job.processedPdfs || {}) };
+    delete cleanedPdfs[pdfFilename];
+
+    // Update log
+    const logEntry = {
+      timestamp: Timestamp.now(),
+      level: 'warning' as const,
+      message: `Cleaned up ${pdfFilename}: removed ${removedSnippets} snippets and ${removedImages} images for re-processing`,
+    };
+
+    await integrationJobRepository.update(jobId, {
+      categoryResults: cleanedResults,
+      processedPdfs: cleanedPdfs,
+      logEntries: [...(job.logEntries || []), logEntry],
+    });
+  }
+
   // ─── Storage Helpers ─────────────────────────────────────────────────────
 
   async uploadImageToStorage(base64: string, path: string): Promise<string> {
