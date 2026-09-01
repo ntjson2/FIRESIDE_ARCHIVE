@@ -59,6 +59,7 @@ Build a privacy-respecting, offline-capable archive for BUPC fireside content wi
 - ✅ Repository/Factory pattern fully implemented
 - ✅ Legacy service layer migrated to repositories
 - ✅ Documentation consolidated and organized
+- ✅ Fireside Integration Pipeline (one-fireside-at-a-time) — guide.md-driven raw PDF import with IndexedDB scratch space + Firestore final atoms, full snippet CRUD, and resume/checkpoint
 
 #### Active Work
 - 🔄 **Seed Data Script**: Populate Firestore with initial Fireside and Snippet data for testing

@@ -2,26 +2,26 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { firesideIntegrationService } from '@/services/firesideIntegrationService';
+import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
+import { localIntegrationService } from '@/services/localIntegrationService';
 import { firesideFamilyRepository } from '@/repositories';
-import { integrationJobRepository } from '@/repositories/IntegrationJobRepository';
-import { FiresideFamily, IntegrationJob, UniversalFiresideCategory, UNIVERSAL_FIRESIDE_CATEGORIES, IntegratedSnippet, IntegratedImage } from '@/types';
+import { FiresideFamily, TransitionEntry, SnippetStatus } from '@/types';
+import {
+  LocalIntegrationJob,
+  LocalIntegrationSnippet,
+  LocalIntegrationImage,
+  FiresideReviewStatus,
+} from '@/lib/indexedDb';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuth } from '@/context/AuthContext';
 import {
-  Upload, ArrowLeft, Play, Pause, RotateCcw, Trash2, AlertTriangle,
-  CheckCircle, Clock, AlertCircle, Loader, FileText, Image, ChevronDown, ChevronRight, Info, HelpCircle, Clipboard, X
+  Upload, ArrowLeft, Play, Trash2, CheckCircle, Clock, Loader,
+  FileText, Image, AlertCircle, Edit3, X, BookOpen, SkipForward, HelpCircle
 } from 'lucide-react';
-import Link from 'next/link';
-import { Timestamp } from 'firebase/firestore';
 
-type PipelineStatus = 'idle' | 'uploading' | 'parsing_guide' | 'processing' | 'reviewing' | 'done' | 'error';
-
-interface JobDisplay extends IntegrationJob {
-  parsedGuide?: boolean;
-}
+const SNIPPET_STATUSES: SnippetStatus[] = ['IN-REVIEW', 'APPROVED', 'REJECTED', 'MERGED', 'DEEPENING', 'UNDER-RESEARCH'];
 
 export default function FiresideIntegrationPage() {
   const { user, profile } = useAuth();
@@ -30,217 +30,189 @@ export default function FiresideIntegrationPage() {
 
   useEffect(() => { if (profile && !isAdmin) router.push('/'); }, [isAdmin, profile, router]);
 
-  // State
-  const [pipStatus, setPipStatus] = useState<PipelineStatus>('idle');
+  // ─── State ──────────────────────────────────────────────────────────────
   const [families, setFamilies] = useState<FiresideFamily[]>([]);
   const [selectedFamilyId, setSelectedFamilyId] = useState('');
+  const [guideContent, setGuideContent] = useState('');
   const [guideFile, setGuideFile] = useState<File | null>(null);
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
-  const [guideContent, setGuideContent] = useState('');
-  const [currentJob, setCurrentJob] = useState<JobDisplay | null>(null);
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [showRevertWarning, setShowRevertWarning] = useState<string | null>(null); // category name or 'all'
 
-  // Load families
+  const [job, setJob] = useState<LocalIntegrationJob | null>(null);
+  const [snippets, setSnippets] = useState<LocalIntegrationSnippet[]>([]);
+  const [images, setImages] = useState<LocalIntegrationImage[]>([]);
+  const [processing, setProcessing] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [error, setError] = useState('');
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const [noteId, setNoteId] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState('');
+
+  const currentFireside: TransitionEntry | null = job
+    ? job.transitions[job.currentFiresideIndex] || null
+    : null;
+
+  // ─── Load families + resume job ─────────────────────────────────────────
   useEffect(() => { firesideFamilyRepository.findAll().then(setFamilies); }, []);
 
-  // Check for existing pending job
-  useEffect(() => {
-    integrationJobRepository.findLatestPending().then(job => {
-      if (job) {
-        setCurrentJob(job);
-        if (job.status === 'PROCESSING') setPipStatus('processing');
-        else if (job.status === 'IN-REVIEW') setPipStatus('reviewing');
-      }
-    });
+  const refreshSnippets = useCallback(async (fireside: string) => {
+    setSnippets(await localIntegrationService.listSnippetsForFireside(fireside));
+    setImages(await localIntegrationService.listImagesForFireside(fireside));
   }, []);
 
-  // Upload guide.md
+  useEffect(() => {
+    (async () => {
+      const existing = await localIntegrationService.getJob();
+      if (existing) {
+        setJob(existing);
+        const cur = existing.transitions[existing.currentFiresideIndex];
+        if (cur) await refreshSnippets(cur.category);
+      }
+    })();
+  }, [refreshSnippets]);
+
+  // ─── Upload handlers ────────────────────────────────────────────────────
   const handleGuideUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setGuideFile(file);
-    const text = await file.text();
-    setGuideContent(text);
+    setGuideContent(await file.text());
   };
 
-  // Upload PDFs
   const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setPdfFiles(prev => [...prev, ...files]);
+    setPdfFiles(prev => [...prev, ...Array.from(e.target.files || [])]);
   };
-
   const removePdf = (idx: number) => setPdfFiles(prev => prev.filter((_, i) => i !== idx));
 
-  // Parse guide & create job
-  const handleParseGuide = async () => {
+  // ─── Create job ─────────────────────────────────────────────────────────
+  const handleCreateJob = async () => {
+    setError('');
     if (!guideContent || !selectedFamilyId || !user) {
-      alert('Please select a family, upload guide.md, and sign in.');
+      setError('Select a family, upload guide.md, and sign in.');
       return;
     }
-    setPipStatus('parsing_guide');
-    try {
-      const { guide, job } = firesideIntegrationService.parseGuide(guideContent, user.uid, selectedFamilyId);
-      const families = await firesideFamilyRepository.findAll();
-      const family = families.find(f => f.id === selectedFamilyId);
-      job.familyName = family?.name || guide.familyName;
-      job.pdfFiles = guide.pdfFiles;
-
-      const jobId = await integrationJobRepository.save({
-      guideFilePath: job.guideFilePath || '',
-      familyId: job.familyId || '',
-      familyName: job.familyName || '',
-      pdfFiles: job.pdfFiles || [],
-      transitions: job.transitions || [],
-      processingPlan: job.processingPlan || [],
-      uploadedBy: job.uploadedBy || '',
-      processedBy: job.processedBy || '',
-      status: job.status || 'PENDING',
-      currentPlanIndex: job.currentPlanIndex || 0,
-      currentPage: job.currentPage || 0,
-      totalPages: job.totalPages || 0,
-      categoryResults: job.categoryResults || {},
-      processedPdfs: job.processedPdfs || {},
-      logEntries: job.logEntries || [],
-    });
-      const created = await integrationJobRepository.findById(jobId);
-      if (created) {
-        setCurrentJob(created);
-        setPipStatus('idle'); // ready to start processing
-      }
-    } catch (err) {
-      console.error('Parse guide failed:', err);
-      alert('Failed to parse guide: ' + String(err));
-      setPipStatus('error');
+    const parsed = localIntegrationService.parseGuide(guideContent);
+    if (parsed.transitions.length === 0) {
+      setError('No transitions found in guide.md. Check the "Fireside Transitions" table.');
+      return;
     }
+    if (parsed.pdfFiles.length === 0) {
+      setError('No PDF files listed in guide.md.');
+      return;
+    }
+
+    // Persist PDF files to IndexedDB (match by guide.md filenames)
+    for (const name of parsed.pdfFiles) {
+      const f = pdfFiles.find(p => p.name === name);
+      if (!f) { setError(`Missing uploaded PDF: "${name}" — upload it before continuing.`); return; }
+    }
+    await localIntegrationService.storePdfFiles(pdfFiles);
+
+    const family = families.find(f => f.id === selectedFamilyId);
+    const created = await localIntegrationService.createJob({
+      familyId: selectedFamilyId,
+      familyName: family?.name || parsed.familyName,
+      uploadedBy: user.uid,
+      guideInstructions: parsed.instructions,
+      pdfFiles: parsed.pdfFiles,
+      transitions: parsed.transitions,
+    });
+    setJob(created);
   };
 
-  // Start processing
-  const handleStartProcessing = async () => {
-    if (!currentJob) return;
-    setIsProcessing(true);
-    setPipStatus('processing');
-
+  // ─── Process current fireside ───────────────────────────────────────────
+  const handleProcessCurrent = async () => {
+    if (!job) return;
+    setProcessing(true);
+    setError('');
     try {
-      const job = currentJob;
-      const plan = firesideIntegrationService.buildProcessingPlan(job.pdfFiles, job.transitions, {});
-      await firesideIntegrationService.saveCheckpoint(job.id, {
-        status: 'PROCESSING',
-        processedBy: user?.uid || '',
-        processingPlan: plan,
-        currentPlanIndex: 0,
-        logEntries: [...(job.logEntries || []), { timestamp: Timestamp.now(), level: 'info', message: `Processing started — ${plan.length} plan entries` }],
-      });
+      await localIntegrationService.processCurrentFireside(job);
+      const updated = await localIntegrationService.getJob();
+      if (updated) {
+        setJob(updated);
+        const cur = updated.transitions[updated.currentFiresideIndex];
+        if (cur) await refreshSnippets(cur.category);
+      }
+    } catch (e) {
+      setError('Processing failed: ' + String(e));
+    } finally { setProcessing(false); }
+  };
 
-      // Simulated pipeline loop (in production, this processes each plan entry)
-      // Each plan entry = one PDF segment for a specific fireside category
-      for (let i = 0; i < plan.length && i < 3; i++) {  // Limit to 3 for demo
-        const entry = plan[i];
-        const logMsg = `Processing ${entry.category}: ${entry.pdfFilename} pages ${entry.startPage}-${entry.endPage}`;
-        const updatedJob = await integrationJobRepository.findById(job.id);
-        if (updatedJob) {
-          await firesideIntegrationService.saveCheckpoint(job.id, {
-            currentPlanIndex: i,
-            currentPage: entry.startPage,
-            logEntries: [...(updatedJob.logEntries || []), { timestamp: Timestamp.now(), level: 'info', message: logMsg }],
-          });
+  // ─── Snippet CRUD ───────────────────────────────────────────────────────
+  const reloadCurrent = async () => {
+    if (!currentFireside) return;
+    await refreshSnippets(currentFireside.category);
+  };
 
-          // Add mock snippets for demo
-          const catResults = updatedJob.categoryResults || {};
-          const cat = entry.category;
-          if (!catResults[cat]) catResults[cat] = { snippets: [], images: [] };
-          catResults[cat].snippets.push({
-            localId: `snippet-${cat}-${i}-${Date.now()}`,
-            text: `Sample extracted snippet for ${cat} from ${entry.pdfFilename} page ${entry.startPage}. This is a 30-50 word teaching unit for review.`,
-            order: (catResults[cat].snippets.length || 0) + 1,
-            status: 'IN-REVIEW',
-            category: cat,
-            categoryConfidence: 0.85,
-            isTransitionBoundary: false,
-            pageNumber: entry.startPage,
-            sourcePdf: entry.pdfFilename,
-          });
-          await firesideIntegrationService.saveCheckpoint(job.id, { categoryResults: catResults });
+  const updateSnippet = async (id: string, updates: Partial<LocalIntegrationSnippet>) => {
+    await localIntegrationService.updateSnippet(id, updates);
+    await reloadCurrent();
+  };
+
+  const handleSaveEdit = async (id: string) => {
+    await updateSnippet(id, { text: editText.trim() || undefined });
+    setEditingId(null);
+    setEditText('');
+  };
+
+  const handleSaveNote = async (id: string) => {
+    if (!noteText.trim()) { setNoteId(null); return; }
+    const snip = snippets.find(s => s.localId === id);
+    if (snip) await updateSnippet(id, { annotation: snip.annotation ? snip.annotation + '\n' + noteText.trim() : noteText.trim() });
+    setNoteId(null);
+    setNoteText('');
+  };
+
+  // ─── Approve / skip / advance ───────────────────────────────────────────
+  const handleApprove = async () => {
+    if (!job) return;
+    setApproving(true);
+    setError('');
+    try {
+      await localIntegrationService.approveFireside(job);
+      const updated = await localIntegrationService.getJob();
+      setJob(updated || null);
+      if (updated && updated.status !== 'COMPLETE') {
+        const cur = updated.transitions[updated.currentFiresideIndex];
+        if (cur) {
+          setSnippets([]);
+          setImages([]);
         }
-
-        // Brief delay to simulate processing
-        await new Promise(r => setTimeout(r, 200));
+      } else if (updated) {
+        setSnippets([]);
+        setImages([]);
       }
-
-      // Mark as IN-REVIEW
-      const finalJob = await integrationJobRepository.findById(job.id);
-      if (finalJob) {
-        await firesideIntegrationService.saveCheckpoint(job.id, {
-          status: 'IN-REVIEW',
-          logEntries: [...(finalJob.logEntries || []), { timestamp: Timestamp.now(), level: 'info', message: 'Processing complete. Ready for review.' }],
-        });
-      }
-
-      const refreshed = await integrationJobRepository.findById(job.id);
-      if (refreshed) setCurrentJob(refreshed);
-      setPipStatus('reviewing');
-    } catch (err) {
-      console.error('Processing failed:', err);
-      setPipStatus('error');
-      if (currentJob) {
-        await firesideIntegrationService.saveCheckpoint(currentJob.id, {
-          errorAt: { planIndex: currentJob.currentPlanIndex, page: currentJob.currentPage, step: 'PROCESSING', message: String(err) },
-          status: 'ERROR',
-        });
-      }
-    } finally { setIsProcessing(false); }
+    } catch (e) {
+      setError('Approve failed: ' + String(e));
+    } finally { setApproving(false); }
   };
 
-  // Revert section
-  const handleRevertCategory = async (category: UniversalFiresideCategory) => {
-    if (!currentJob) return;
-    const catResults = { ...(currentJob.categoryResults || {}) };
-    delete catResults[category];
-    await firesideIntegrationService.saveCheckpoint(currentJob.id, {
-      categoryResults: catResults,
-      logEntries: [...(currentJob.logEntries || []), { timestamp: Timestamp.now(), level: 'warning', message: `Reverted category: ${category}` }],
-    });
-    const refreshed = await integrationJobRepository.findById(currentJob.id);
-    if (refreshed) setCurrentJob(refreshed);
-    setShowRevertWarning(null);
+  const handleSkip = async () => {
+    if (!job) return;
+    await localIntegrationService.skipFireside(job);
+    const updated = await localIntegrationService.getJob();
+    setJob(updated || null);
+    setSnippets([]);
+    setImages([]);
   };
 
-  // Revert entire job
-  const handleRevertEntireJob = async () => {
-    if (!currentJob) return;
-    await integrationJobRepository.delete(currentJob.id);
-    setCurrentJob(null);
-    setPipStatus('idle');
-    setShowRevertWarning(null);
+  const handleReset = async () => {
+    if (!confirm('Reset the entire integration? All local progress (and in-progress snippets) will be lost. Already-approved snippets in Firestore are NOT reverted.')) return;
+    await localIntegrationService.resetJob();
+    setJob(null);
+    setSnippets([]);
+    setImages([]);
+    setPdfFiles([]);
+    setGuideContent('');
+    setGuideFile(null);
   };
 
-  const toggleCategory = (cat: string) => {
-    setExpandedCategories(prev => {
-      const next = new Set(prev);
-      next.has(cat) ? next.delete(cat) : next.add(cat);
-      return next;
-    });
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'IN-REVIEW': return <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">IN-REVIEW</span>;
-      case 'APPROVED': return <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">APPROVED</span>;
-      case 'DEEPENING': return <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full">DEEPENING</span>;
-      case 'UNDER-RESEARCH': return <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full">UNDER-RESEARCH</span>;
-      default: return <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{status}</span>;
-    }
-  };
-
-  const totalSnippets = currentJob?.categoryResults
-    ? Object.values(currentJob.categoryResults).reduce((sum, c) => sum + (c.snippets?.length || 0), 0)
-    : 0;
-  const totalImages = currentJob?.categoryResults
-    ? Object.values(currentJob.categoryResults).reduce((sum, c) => sum + (c.images?.length || 0), 0)
-    : 0;
-
-  const [showGuide, setShowGuide] = useState(false);
+  // ─── Reset local state when current fireside changes on advance ────────
+  useEffect(() => {
+    if (!currentFireside) return;
+    refreshSnippets(currentFireside.category);
+  }, [currentFireside?.category, refreshSnippets]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isAdmin) return null;
 
@@ -252,12 +224,10 @@ export default function FiresideIntegrationPage() {
 | 1 | Why Life | raw-collection-1.pdf | 1 |
 | 2 | The Proofs for Jesus Christ | raw-collection-1.pdf | 34 |
 | 3 | The Proofs for Baha'U'llah | raw-collection-2.pdf | 20 |
-| 4 | The Covenant | raw-collection-4.pdf | 3 |
 
 ## PDF Files
 - raw-collection-1.pdf
 - raw-collection-2.pdf
-- raw-collection-4.pdf
 
 ## LLM Instructions
 These are scanned fireside collections. Use the transition table above.`;
@@ -268,12 +238,11 @@ These are scanned fireside collections. Use the transition table above.`;
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Fireside Integration Pipeline</h1>
-          <p className="text-muted-foreground">Upload guide.md + raw PDFs, process into the archive, review and approve.</p>
-          {currentJob && (
+          <p className="text-muted-foreground">Upload guide.md + raw PDFs, review one fireside at a time, approve into the archive.</p>
+          {job && (
             <p className="text-sm text-muted-foreground mt-1">
-              Job: <span className="font-medium">{currentJob.familyName}</span>
-              {currentJob.uploadedBy && ` · Uploaded by ${currentJob.uploadedBy}`}
-              {totalSnippets > 0 && ` · ${totalSnippets} snippets, ${totalImages} images`}
+              Family: <span className="font-medium">{job.familyName}</span>
+              {job.uploadedBy && ` · Uploaded by ${job.uploadedBy}`}
             </p>
           )}
         </div>
@@ -282,43 +251,87 @@ These are scanned fireside collections. Use the transition table above.`;
         </Link>
       </div>
 
-      {/* Guidance Banner */}
+      {/* ─── FAQ / How it works ──────────────────────────────────────────── */}
       <details className="bg-card rounded-lg border border-border p-4" open>
         <summary className="cursor-pointer font-semibold text-sm flex items-center gap-2">
-          <Info className="h-4 w-4 text-primary" />
-          Getting Started with the Integration Pipeline
+          <HelpCircle className="h-4 w-4 text-primary" />
+          How this works — FAQ
         </summary>
-        <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-          <p><strong>1. Select a Fireside Family</strong> — Choose which family this collection belongs to (<a href="/admin/families" className="text-primary underline" target="_blank">create families via Admin → Fireside Families</a>).</p>
-          <p><strong>2. Upload guide.md</strong> — Defines PDF list, fireside transition boundaries, and LLM instructions. <button className="text-primary underline" onClick={() => setShowGuide(!showGuide)}>View template</button>.</p>
-          <p><strong>3. Upload raw PDFs</strong> — All scanned PDF files referenced in the guide.md. Can be image-based or text-based.</p>
-          <p><strong>4. Parse Guide & Create Job</strong> — Validates the guide and creates a checkpoint in Firestore.</p>
-          <p><strong>5. Start Processing</strong> — DeepSeek Reasoner extracts and classifies snippets; Gemini Flash labels images.</p>
-          <p><strong>6. Review & Approve</strong> — Expand categories, edit snippets, change statuses, then approve.</p>
-        </div>
-        <div className="mt-4 border-t border-border pt-3">
-          <p className="font-semibold text-sm mb-2 flex items-center gap-1"><HelpCircle className="h-3 w-3" /> FAQ</p>
-          <div className="space-y-2 text-xs text-muted-foreground">
-            <p><strong>Q: How are fireside boundaries determined?</strong><br/>A: You define them in guide.md's transition table (PDF + page number). The system auto-computes page ranges between transitions.</p>
-            <p><strong>Q: Can I resume if the browser closes?</strong><br/>A: Yes. Every step saves a checkpoint to Firestore. Reopen the page and it auto-detects the pending job.</p>
-            <p><strong>Q: How do I undo a mistake?</strong><br/>A: Use "Revert" per category or "Revert Entire Job" on the status bar. This cleans up Firestore + Storage.</p>
-            <p><strong>Q: What if a PDF spans multiple firesides?</strong><br/>A: A PDF not listed in the transition table belongs to the current fireside. Only transition points are listed — the system handles the rest.</p>
-          </div>
-          {showGuide && (
-            <div className="mt-3 bg-muted p-3 rounded-md font-mono text-xs relative">
-              <button className="absolute top-2 right-2 text-muted-foreground hover:text-foreground" onClick={() => setShowGuide(false)}><X className="h-4 w-4" /></button>
-              <pre className="whitespace-pre-wrap">{guideTemplate}</pre>
+        <div className="mt-3 space-y-2">
+
+          <details className="border border-border rounded-md px-3 py-2">
+            <summary className="cursor-pointer text-sm font-medium">How is a guide.md formatted?</summary>
+            <div className="mt-2 text-sm text-muted-foreground space-y-2">
+              <p>The guide defines the family name, the PDF source order, where each fireside begins, and optional LLM instructions.</p>
+              <pre className="bg-muted p-3 rounded-md font-mono text-xs whitespace-pre-wrap">{guideTemplate}</pre>
+              <p>
+                <strong>Rules:</strong>
+                The <code className="font-mono"># | Fireside | PDF | Page</code> table lists each fireside transition
+                (the PDF and page where that fireside starts). Only transition points are listed — a PDF that is not a
+                transition start still belongs to the current fireside (this lets you "skip" a PDF in the sequence).
+                The <code className="font-mono">## PDF Files</code> list must include every raw PDF, in reading order.
+              </p>
             </div>
-          )}
+          </details>
+
+          <details className="border border-border rounded-md px-3 py-2">
+            <summary className="cursor-pointer text-sm font-medium">How does this work?</summary>
+            <div className="mt-2 text-sm text-muted-foreground space-y-1">
+              <p>1. <strong>Parse guide.md</strong> — identify family name, PDF order, and fireside transition boundaries.</p>
+              <p>2. <strong>Store locally</strong> — PDF blobs and progress are saved to your browser (IndexedDB), not Firestore.</p>
+              <p>3. <strong>Process one fireside</strong> — the current fireside's page range is parsed and text is grouped into 30–50 word snippets.</p>
+              <p>4. <strong>Review & edit</strong> — edit, delete/restore, change status, flag as deepening, or add notes.</p>
+              <p>5. <strong>Approve</strong> — final atomized <code className="font-mono">fireside</code> + <code className="font-mono">snippet</code>(+<code className="font-mono">deepening</code>) docs are written to Firestore, then it advances to the next fireside.</p>
+            </div>
+          </details>
+
+          <details className="border border-border rounded-md px-3 py-2">
+            <summary className="cursor-pointer text-sm font-medium">Example workflow & expected results</summary>
+            <div className="mt-2 text-sm text-muted-foreground space-y-1">
+              <p>1. Create a Fireside Family via <strong>Admin → Fireside Families</strong> (e.g. "General Firesides").</p>
+              <p>2. Upload a <code className="font-mono">guide.md</code> and the raw PDFs it references.</p>
+              <p>3. Click <strong>Create Job</strong> — a progress bar shows "Fireside 1 of N".</p>
+              <p>4. Click <strong>Process This Fireside</strong> — the first fireside's snippets (and any images) appear below with a preview.</p>
+              <p>5. Review, edit, delete, or flag items as needed.</p>
+              <p>6. Click <strong>Approve Fireside</strong> — the snippets are written to Firestore and the page advances to fireside 2.</p>
+              <p>7. Repeat until all firesides are processed; the page shows <strong>Integration Complete</strong>.</p>
+              <p className="text-xs">Expected: each approved fireside becomes one Fireside record with several Snippets (in natural order) under the chosen family.</p>
+            </div>
+          </details>
+
+          <details className="border border-border rounded-md px-3 py-2">
+            <summary className="cursor-pointer text-sm font-medium">What happens when I approve?</summary>
+            <p className="mt-2 text-sm text-muted-foreground">
+              One <code className="font-mono">fireside</code> document is created under the selected family, plus one
+              <code className="font-mono"> snippet</code> per kept snippet (and a linked <code className="font-mono">deepening</code>
+              if you flagged it as deepening). Snippets you deleted or skipped are not written.
+            </p>
+          </details>
+
+          <details className="border border-border rounded-md px-3 py-2">
+            <summary className="cursor-pointer text-sm font-medium">Where is my progress saved? Can I resume?</summary>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Progress and raw PDFs are saved in your browser via IndexedDB, so reloading the page resumes exactly where you left
+              off (same browser). <strong>Reset</strong> clears local progress but does not remove content already approved to Firestore.
+            </p>
+          </details>
+
+          <details className="border border-border rounded-md px-3 py-2">
+            <summary className="cursor-pointer text-sm font-medium">What if a PDF is missing or unreadable?</summary>
+            <p className="mt-2 text-sm text-muted-foreground">
+              If a guide references a PDF you did not upload (or one that fails to parse), the job logs a warning and skips that
+              PDF's pages for the current fireside. Re-attach the PDF and click <strong>Re-process</strong> to retry.
+            </p>
+          </details>
+
         </div>
       </details>
 
-      {/* Upload Section */}
-      {pipStatus !== 'reviewing' && pipStatus !== 'processing' && (
+      {/* ─── No job: upload / create ─────────────────────────────────────── */}
+      {!job && (
         <div className="bg-card rounded-lg border border-border p-6 space-y-4">
-          <h2 className="text-lg font-semibold">Upload Files</h2>
+          <h2 className="text-lg font-semibold">Start a New Integration</h2>
 
-          {/* Family selector */}
           <div className="space-y-1">
             <Label>Target Fireside Family</Label>
             <select value={selectedFamilyId} onChange={e => setSelectedFamilyId(e.target.value)}
@@ -328,7 +341,6 @@ These are scanned fireside collections. Use the transition table above.`;
             </select>
           </div>
 
-          {/* guide.md upload */}
           <div className="space-y-1">
             <Label>guide.md</Label>
             <div className="flex items-center gap-3">
@@ -338,23 +350,22 @@ These are scanned fireside collections. Use the transition table above.`;
               </label>
               {guideFile && <span className="text-sm text-muted-foreground">✅ {guideFile.name}</span>}
             </div>
+            {guideContent && (
+              <pre className="mt-2 bg-muted p-3 rounded-md font-mono text-xs whitespace-pre-wrap max-h-48 overflow-y-auto">{guideContent}</pre>
+            )}
           </div>
 
-          {/* PDF upload */}
           <div className="space-y-1">
-            <Label>Raw Fireside PDFs</Label>
-            <div className="flex items-center gap-3">
-              <label className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-9 px-3">
-                <FileText className="mr-2 h-4 w-4" />Add PDFs
-                <input type="file" accept=".pdf" multiple onChange={handlePdfUpload} className="hidden" />
-              </label>
-            </div>
+            <Label>Raw Fireside PDFs (must match guide.md filenames)</Label>
+            <label className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-9 px-3">
+              <FileText className="mr-2 h-4 w-4" />Add PDFs
+              <input type="file" accept=".pdf" multiple onChange={handlePdfUpload} className="hidden" />
+            </label>
             {pdfFiles.length > 0 && (
               <ul className="mt-2 space-y-1">
                 {pdfFiles.map((f, i) => (
                   <li key={i} className="flex items-center gap-2 text-sm">
-                    <FileText className="h-3 w-3 text-muted-foreground" />
-                    {f.name}
+                    <FileText className="h-3 w-3 text-muted-foreground" />{f.name}
                     <button onClick={() => removePdf(i)} className="text-destructive hover:underline text-xs">Remove</button>
                   </li>
                 ))}
@@ -362,280 +373,222 @@ These are scanned fireside collections. Use the transition table above.`;
             )}
           </div>
 
-          <Button onClick={handleParseGuide} disabled={!guideContent || !selectedFamilyId}>
-            <Play className="mr-2 h-4 w-4" />Parse Guide & Create Job
-          </Button>
-        </div>
-      )}
-
-      {/* Processing / Reviewing View */}
-      {(pipStatus === 'processing' || pipStatus === 'reviewing') && currentJob && (
-        <>
-          {/* Job Status Bar */}
-          <div className="bg-card rounded-lg border border-border p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {pipStatus === 'processing' ? (
-                  <Loader className="h-5 w-5 text-primary animate-spin" />
-                ) : (
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                )}
-                <span className="font-semibold">
-                  {pipStatus === 'processing' ? 'Processing...' : 'Ready for Review'}
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  Plan: {currentJob.currentPlanIndex + 1} of {currentJob.processingPlan?.length || 0}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                {pipStatus === 'reviewing' && (
-                  <Button size="sm" onClick={handleStartProcessing} disabled={isProcessing}>
-                    <Play className="mr-1 h-4 w-4" />Resume Processing
-                  </Button>
-                )}
-                <button
-                  className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-3"
-                  onClick={() => setShowRevertWarning('all')}>
-                  <Trash2 className="mr-1 h-4 w-4" />Revert Entire Job
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* PDF Processing Status Table */}
-          {currentJob.pdfFiles && currentJob.pdfFiles.length > 0 && (
-            <div className="bg-card rounded-lg border border-border p-4">
-              <h3 className="font-semibold mb-3">PDF Processing Status</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="text-left text-muted-foreground">
-                    <tr>
-                      <th className="pb-2 font-medium">PDF File</th>
-                      <th className="pb-2 font-medium">Status</th>
-                      <th className="pb-2 font-medium">Pages</th>
-                      <th className="pb-2 font-medium">Firesides Contributed</th>
-                      <th className="pb-2 font-medium text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentJob.pdfFiles.map((pdfName: string) => {
-                      const status = currentJob.processedPdfs?.[pdfName];
-                      const isComplete = status?.status === 'complete';
-                      const isError = status?.status === 'error';
-                      const isPartial = status?.status === 'partial';
-                      return (
-                        <tr key={pdfName} className="border-t border-border">
-                          <td className="py-2 font-mono text-xs">{pdfName}</td>
-                          <td className="py-2">
-                            {isComplete ? (
-                              <span className="inline-flex items-center gap-1 text-green-400"><CheckCircle className="h-3 w-3" /> Complete</span>
-                            ) : isError ? (
-                              <span className="inline-flex items-center gap-1 text-red-400"><AlertCircle className="h-3 w-3" /> Error</span>
-                            ) : isPartial ? (
-                              <span className="inline-flex items-center gap-1 text-yellow-400"><Clock className="h-3 w-3" /> Partial</span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-muted-foreground"><Clock className="h-3 w-3" /> Pending</span>
-                            )}
-                          </td>
-                          <td className="py-2 text-muted-foreground">
-                            {status ? `${status.pagesProcessed}/${status.totalPages}` : '—'}
-                          </td>
-                          <td className="py-2 text-muted-foreground text-xs">
-                            {status?.firesidesContributed?.join(', ') || '—'}
-                          </td>
-                          <td className="py-2 text-right">
-                            {status && !isComplete && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-primary hover:text-primary"
-                                onClick={async () => {
-                                  if (!confirm(`Reprocess ${pdfName}? All existing data from this PDF will be deleted first.`)) return;
-                                  await firesideIntegrationService.cleanupPdfResults(currentJob.id, pdfName);
-                                  const refreshed = await integrationJobRepository.findById(currentJob.id);
-                                  if (refreshed) setCurrentJob(refreshed);
-                                  handleStartProcessing();
-                                }}
-                              >
-                                <RotateCcw className="mr-1 h-3 w-3" /> Redo
-                              </Button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/40 rounded-md p-3 text-sm text-destructive flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />{error}
             </div>
           )}
 
-          {/* Category Results */}
-          <div className="space-y-3">
-            <h2 className="text-lg font-semibold">Fireside Categories</h2>
-            {UNIVERSAL_FIRESIDE_CATEGORIES.map(cat => {
-              const data = currentJob.categoryResults?.[cat];
-              const snippetCount = data?.snippets?.length || 0;
-              const imageCount = data?.images?.length || 0;
-              const isExpanded = expandedCategories.has(cat);
-              const hasContent = snippetCount > 0 || imageCount > 0;
+          <Button onClick={handleCreateJob} disabled={!guideContent || !selectedFamilyId}>
+            <Play className="mr-2 h-4 w-4" />Create Job
+          </Button>
 
-              return (
-                <div key={cat} className="bg-card rounded-lg border border-border">
-                  <div
-                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-accent/50"
-                    onClick={() => toggleCategory(cat)}
-                  >
-                    <div className="flex items-center gap-2">
-                      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                      <span className={`font-medium ${hasContent ? 'text-foreground' : 'text-muted-foreground'}`}>
-                        {cat}
-                      </span>
-                      {hasContent ? (
-                        <span className="text-xs text-muted-foreground">
-                          ({snippetCount} snippets, {imageCount} images)
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground italic">Empty</span>
-                      )}
-                    </div>
-                    {hasContent && (
-                      <div className="flex gap-2" onClick={e => e.stopPropagation()}>
-                        {snippetCount > 0 && (
-                          <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setShowRevertWarning(cat)}>
-                            <Trash2 className="mr-1 h-3 w-3" />Revert
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+          <details className="text-xs text-muted-foreground">
+            <summary className="cursor-pointer">View guide.md template</summary>
+            <pre className="mt-2 bg-muted p-3 rounded-md font-mono whitespace-pre-wrap">{guideTemplate}</pre>
+          </details>
+        </div>
+      )}
 
-                  {isExpanded && hasContent && (
-                    <div className="border-t border-border p-4 space-y-2">
-                      {/* Snippets */}
-                      {data!.snippets?.map((s: IntegratedSnippet, i: number) => (
-                        <div key={s.localId || i} className="flex items-start gap-3 p-2 rounded bg-secondary/10">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono text-muted-foreground">#{s.order}</span>
-                              {getStatusBadge(s.status)}
-                              {s.annotationType && (
-                                <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full">
-                                  {s.annotationType}
-                                </span>
-                              )}
-                              {s.categoryConfidence < 0.5 && (
-                                <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">Low confidence</span>
-                              )}
+      {/* ─── Job active: progress + one fireside at a time ───────────────── */}
+      {job && (
+        <>
+          {/* Progress bar */}
+          <div className="bg-card rounded-lg border border-border p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">
+                Fireside {job.currentFiresideIndex + 1} of {job.transitions.length}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-8 px-3 text-muted-foreground"
+                  onClick={handleReset}>
+                  <Trash2 className="mr-1 h-3 w-3" />Reset
+                </button>
+              </div>
+            </div>
+            <div className="w-full bg-secondary rounded-full h-2">
+              <div className="bg-primary h-2 rounded-full transition-all"
+                style={{ width: `${(job.currentFiresideIndex / Math.max(1, job.transitions.length)) * 100}%` }} />
+            </div>
+            {/* Transition status list */}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {job.transitions.map((t, i) => {
+                const st = job.firesideStatuses[t.category] as FiresideReviewStatus | undefined;
+                return (
+                  <span key={t.category + i}
+                    className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${
+                      i === job.currentFiresideIndex ? 'border-primary text-primary' :
+                      st === 'approved' ? 'border-green-500/40 text-green-500' :
+                      st === 'skipped' ? 'border-muted text-muted-foreground' : 'border-border text-muted-foreground'
+                    }`}>
+                    {i + 1}. {t.category}
+                    {i < job.currentFiresideIndex && (st === 'approved' ? <CheckCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />)}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ─── Current fireside ─────────────────────────────────────────── */}
+          {currentFireside && job.status !== 'COMPLETE' && (
+            <div className="bg-card rounded-lg border border-border p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold">{currentFireside.category}</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {job.firesideStatuses[currentFireside.category] === 'preview'
+                      ? 'Preview ready — review and edit below, then approve.'
+                      : 'Not processed yet.'}
+                  </p>
+                </div>
+                <span className="text-sm font-mono text-muted-foreground">
+                  p.{currentFireside.pageNumber} · {currentFireside.pdfFilename}
+                </span>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex flex-wrap gap-2">
+                {job.firesideStatuses[currentFireside.category] !== 'preview' && (
+                  <Button onClick={handleProcessCurrent} disabled={processing}>
+                    {processing ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+                    {processing ? 'Processing...' : 'Process This Fireside'}
+                  </Button>
+                )}
+                {job.firesideStatuses[currentFireside.category] === 'preview' && (
+                  <>
+                    <Button onClick={handleProcessCurrent} variant="outline" disabled={processing}>
+                      <Loader className="mr-2 h-4 w-4" />Re-process
+                    </Button>
+                    <Button onClick={handleApprove} disabled={approving}>
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      {approving ? 'Approving...' : 'Approve Fireside'}
+                    </Button>
+                  </>
+                )}
+                <Button onClick={handleSkip} variant="ghost" disabled={processing || approving}>
+                  <SkipForward className="mr-2 h-4 w-4" />Skip Fireside
+                </Button>
+              </div>
+
+              {error && (
+                <div className="bg-destructive/10 border border-destructive/40 rounded-md p-3 text-sm text-destructive flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />{error}
+                </div>
+              )}
+
+              {/* Snippets preview + CRUD */}
+              {(snippets.length > 0 || images.length > 0) && (
+                <div className="border-t border-border pt-3 space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    {snippets.length} snippets · {images.length} images
+                  </p>
+
+                  {snippets.map((s, idx) => {
+                    const isDeleted = s.action === 'delete' || s.action === 'skip';
+                    return (
+                      <div key={s.localId}
+                        className={`p-3 rounded-md border ${isDeleted ? 'border-destructive/40 bg-destructive/5 opacity-60' : 'border-border bg-secondary/10'}`}>
+                        <div className="flex items-start gap-2">
+                          <span className="text-xs font-mono text-muted-foreground mt-1">#{idx + 1}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {/* Status select */}
+                              <select
+                                value={s.status}
+                                onChange={e => updateSnippet(s.localId, { status: e.target.value as SnippetStatus })}
+                                className="text-xs px-2 py-1 rounded-md border border-border bg-background">
+                                {SNIPPET_STATUSES.map(st => <option key={st} value={st}>{st}</option>)}
+                              </select>
+                              {/* Deepening toggle */}
+                              <button
+                                onClick={() => updateSnippet(s.localId, { action: s.action === 'deepening' ? 'keep' : 'deepening' })}
+                                className={`text-xs px-2 py-0.5 rounded-full ${s.action === 'deepening' ? 'bg-purple-500/20 text-purple-400' : 'bg-muted text-muted-foreground'}`}>
+                                {s.action === 'deepening' ? 'Deepening' : 'Deepen'}
+                              </button>
+                              <span className="text-xs text-muted-foreground">p.{s.pageNumber} · {s.sourcePdf}</span>
                             </div>
-                            <p className="text-sm mt-1">{s.text}</p>
+
+                            {editingId === s.localId ? (
+                              <div className="mt-2 space-y-2">
+                                <textarea value={editText} onChange={e => setEditText(e.target.value)}
+                                  className="w-full min-h-[90px] p-2 border border-border rounded-md bg-background font-mono text-sm" />
+                                <div className="flex gap-2">
+                                  <Button size="sm" onClick={() => handleSaveEdit(s.localId)}><CheckCircle className="mr-1 h-3 w-3" />Save</Button>
+                                  <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-sm mt-1 whitespace-pre-wrap">{s.text}</p>
+                            )}
+
                             {s.annotation && (
                               <p className="text-xs text-muted-foreground mt-1 italic">💬 {s.annotation}</p>
                             )}
-                            <p className="text-xs text-muted-foreground mt-1">p.{s.pageNumber} · {s.sourcePdf}</p>
-                          </div>
-                        </div>
-                      ))}
-                      {/* Images */}
-                      {data!.images?.map((img: IntegratedImage, i: number) => (
-                        <div key={img.localId || i} className="flex items-start gap-3 p-2 rounded bg-secondary/10">
-                          <Image className="h-5 w-5 text-muted-foreground mt-1" />
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              {getStatusBadge(img.status)}
-                              <span className="text-sm font-medium">{img.geminiLabel || 'Unlabeled image'}</span>
-                            </div>
-                            {img.croppedImageUrl && <img src={img.croppedImageUrl} className="max-h-32 rounded mt-1 border" />}
-                            <p className="text-xs text-muted-foreground mt-1">p.{img.pageNumber} · {img.sourcePdf}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
 
-          {/* Log */}
-          {currentJob.logEntries && currentJob.logEntries.length > 0 && (
-            <div className="bg-card rounded-lg border border-border p-4">
-              <h3 className="font-semibold mb-2">Processing Log</h3>
-              <div className="max-h-48 overflow-y-auto space-y-1 text-xs font-mono">
-                {currentJob.logEntries.map((entry, i) => (
-                  <div key={i} className={`${
-                    entry.level === 'error' ? 'text-red-400' :
-                    entry.level === 'warning' ? 'text-yellow-400' : 'text-muted-foreground'
-                  }`}>
-                    [{entry.timestamp?.toDate?.()?.toLocaleTimeString?.() || ''}] {entry.message}
-                  </div>
-                ))}
+                            {noteId === s.localId && (
+                              <div className="mt-2 flex gap-2">
+                                <Input value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Add a note..." className="flex-1" />
+                                <Button size="sm" onClick={() => handleSaveNote(s.localId)}>Save</Button>
+                                <Button size="sm" variant="ghost" onClick={() => setNoteId(null)}>Cancel</Button>
+                              </div>
+                            )}
+
+                            <div className="flex gap-1 mt-2">
+                              <Button variant="ghost" size="sm" onClick={() => { setEditingId(s.localId); setEditText(s.text); }}>
+                                <Edit3 className="mr-1 h-3 w-3" />Edit
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => { setNoteId(s.localId); setNoteText(''); }}>
+                                <BookOpen className="mr-1 h-3 w-3" />Note
+                              </Button>
+                              {isDeleted ? (
+                                <Button variant="ghost" size="sm" onClick={() => updateSnippet(s.localId, { action: 'keep' })}>
+                                  Restore
+                                </Button>
+                              ) : (
+                                <Button variant="ghost" size="sm"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => updateSnippet(s.localId, { action: 'delete' })}>
+                                  <X className="mr-1 h-3 w-3" />Delete
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {images.map(img => (
+                    <div key={img.localId} className="flex items-start gap-2 p-3 rounded-md border border-border bg-secondary/10">
+                      <Image className="h-5 w-5 text-muted-foreground mt-1" />
+                      <div className="flex-1">
+                        <p className="text-xs text-muted-foreground">p.{img.pageNumber} · {img.sourcePdf}</p>
+                        {img.dataUrl && <img src={img.dataUrl} alt="" className="max-h-40 rounded mt-1 border border-border" />}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ─── Complete ─────────────────────────────────────────────────── */}
+          {job.status === 'COMPLETE' && (
+            <div className="bg-card rounded-lg border border-border p-12 text-center">
+              <CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-4" />
+              <h2 className="text-xl font-semibold">Integration Complete</h2>
+              <p className="text-muted-foreground mt-2">
+                {job.transitions.length} fireside(s) processed.
+                Approved firesides are now atomized as snippets in the archive.
+              </p>
+              <div className="flex gap-3 justify-center mt-6">
+                <Link href="/admin/firesides"><Button variant="outline">View Firesides</Button></Link>
+                <Button variant="ghost" onClick={handleReset}><Upload className="mr-2 h-4 w-4" />New Integration</Button>
               </div>
             </div>
           )}
         </>
-      )}
-
-      {/* Error State */}
-      {pipStatus === 'error' && currentJob?.errorAt && (
-        <div className="bg-card rounded-lg border border-destructive p-6 text-center">
-          <AlertCircle className="h-12 w-12 mx-auto text-destructive mb-4" />
-          <h2 className="text-xl font-semibold">Processing Error</h2>
-          <p className="text-muted-foreground mt-2">{currentJob.errorAt.message}</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Stuck at plan index {currentJob.errorAt.planIndex}, page {currentJob.errorAt.page}
-          </p>
-          <div className="flex gap-2 justify-center mt-4">
-            <Button onClick={handleStartProcessing}><RotateCcw className="mr-2 h-4 w-4" />Resume from Checkpoint</Button>
-          </div>
-        </div>
-      )}
-
-      {/* Revert Warning Modal */}
-      {showRevertWarning && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-card p-6 rounded-lg border border-destructive/50 max-w-md shadow-xl">
-            <AlertTriangle className="h-8 w-8 text-destructive mb-4" />
-            <h3 className="text-lg font-bold">
-              {showRevertWarning === 'all' ? 'Revert Entire Job?' : `Revert "${showRevertWarning}"?`}
-            </h3>
-            <p className="text-muted-foreground mt-2">
-              {showRevertWarning === 'all'
-                ? `This will delete ALL ${totalSnippets} snippets, ${totalImages} images, and the entire job. This cannot be undone.`
-                : `This will delete all snippets and images in the "${showRevertWarning}" category.`
-              }
-            </p>
-            <div className="flex gap-2 mt-4 justify-end">
-              <Button variant="outline" onClick={() => setShowRevertWarning(null)}>Cancel</Button>
-              <button
-                className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90 h-10 px-4"
-                onClick={() => {
-                  if (showRevertWarning === 'all') handleRevertEntireJob();
-                  else handleRevertCategory(showRevertWarning as UniversalFiresideCategory);
-                }}>
-                Delete Permanently
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Done */}
-      {pipStatus === 'done' && (
-        <div className="bg-card rounded-lg border border-border p-12 text-center">
-          <CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-4" />
-          <h2 className="text-xl font-semibold">Integration Complete</h2>
-          <p className="text-muted-foreground mt-2">
-            {currentJob?.categoryResults ? Object.values(currentJob.categoryResults).reduce((s, c) => s + c.snippets.length, 0) : 0} snippets processed across{' '}
-            {currentJob?.categoryResults ? Object.keys(currentJob.categoryResults).length : 0} categories.
-          </p>
-          <div className="flex gap-3 justify-center mt-6">
-            <Link href="/admin/firesides"><Button variant="outline">View Firesides</Button></Link>
-            <Button onClick={() => { setCurrentJob(null); setPipStatus('idle'); }}>
-              <Upload className="mr-2 h-4 w-4" />New Integration
-            </Button>
-          </div>
-        </div>
       )}
     </div>
   );

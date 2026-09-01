@@ -13,6 +13,21 @@ interface PdfTextItem {
   isBold: boolean;
 }
 
+interface PdfTextContentItem {
+  str?: string;
+  transform?: number[];
+  fontName?: string;
+}
+
+interface PdfViewportLike {
+  width: number;
+  height: number;
+}
+
+interface PdfPageLike {
+  render(params: unknown): { promise: Promise<unknown> };
+}
+
 interface PdfImageItem {
   pageNumber: number;
   y: number;
@@ -26,7 +41,7 @@ interface PdfImageItem {
 export class PdfParserService {
 
   /** Parse a PDF file into raw text and image items */
-  async parsePdf(file: File): Promise<{ textItems: PdfTextItem[]; images: PdfImageItem[] }> {
+  async parsePdf(file: File): Promise<{ textItems: PdfTextItem[]; images: PdfImageItem[]; numPages: number }> {
     const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist');
     GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.worker.min.mjs';
 
@@ -43,13 +58,14 @@ export class PdfParserService {
 
       // Extract text items with position
       for (const item of textContent.items) {
-        if ('str' in item && item.str.trim()) {
-          const transform = (item as any).transform || [1, 0, 0, 1, 0, 0];
+        const typed = item as PdfTextContentItem;
+        if (typed.str && typed.str.trim()) {
+          const transform = typed.transform || [1, 0, 0, 1, 0, 0];
           const fontSize = transform[0] || 12;
-          const fontName = (item as any).fontName || '';
+          const fontName = typed.fontName || '';
 
           textItems.push({
-            text: item.str.trim(),
+            text: typed.str.trim(),
             pageNumber: pageNum,
             y: Math.round(transform[5] || 0), // y position
             fontSize: Math.round(fontSize),
@@ -73,16 +89,26 @@ export class PdfParserService {
       }
     }
 
-    return { textItems, images };
+    return { textItems, images, numPages: pdf.numPages };
+  }
+
+  /** Get just the page count of a PDF without extracting text/images */
+  async getPageCount(file: File): Promise<number> {
+    const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist');
+    GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.worker.min.mjs';
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await getDocument({ data: arrayBuffer }).promise;
+    return pdf.numPages;
   }
 
   /** Convert parsed PDF items into ordered chunks */
   createChunks(textItems: PdfTextItem[], images: PdfImageItem[]): ParsedChunk[] {
-    let chunks: ParsedChunk[] = [];
+    const chunks: ParsedChunk[] = [];
     let orderCounter = 0;
 
     // Merge text and image items sorted by page, then y position
-    type MergedItem = { type: ChunkType; pageNumber: number; y: number; data: any };
+    type MergedItem = { type: ChunkType; pageNumber: number; y: number; data: PdfTextItem | PdfImageItem };
     const merged: MergedItem[] = [
       ...textItems.map(t => ({ type: 'text' as ChunkType, pageNumber: t.pageNumber, y: t.y, data: t })),
       ...images.map(i => ({ type: 'image' as ChunkType, pageNumber: i.pageNumber, y: i.y, data: i })),
@@ -280,7 +306,7 @@ Return ONLY valid JSON:
 
   // ─── Private Helpers ──────────────────────────────────────────────────────
 
-  private async extractImageFromPage(page: any, viewport: any): Promise<{ width: number; height: number; base64: string } | null> {
+  private async extractImageFromPage(page: PdfPageLike, viewport: PdfViewportLike): Promise<{ width: number; height: number; base64: string } | null> {
     try {
       // Create a canvas from the page render
       const canvas = document.createElement('canvas');

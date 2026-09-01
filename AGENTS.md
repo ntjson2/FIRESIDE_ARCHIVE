@@ -139,11 +139,13 @@ FiresideFamily (e.g. "General Firesides")
 - Full admin CRUD: firesides, families, snippets, deepenings, references, tags
 - Consolidated Navbar with "Admin" dropdown (2 sections: Content + Reference)
 - **Fireside Integration Pipeline** (`/admin/fireside-integration`):
-  - guide.md-driven PDF batch import
-  - DeepSeek Reasoner v4 extraction + classification
-  - Gemini Flash image labeling
-  - Checkpoint/resume, per-PDF redo, per-category revert
-  - LLM annotations for questionable text
+  - guide.md-driven import: define fireside transitions + PDF list + LLM instructions
+  - One fireside at a time: process → preview → review/CRUD → approve → next
+  - Local-first scratch space in **IndexedDB** (`src/lib/indexedDb.ts`): raw PDF blobs, parsed snippets, job cursor/status
+  - **Firestore holds only final atoms** — `fireside`, `snippet` (+ `deepening` when flagged), written on "Approve Fireside"
+  - Snippet preview with full CRUD: edit, delete/restore, status (IN-REVIEW/APPROVED/REJECTED/MERGED/DEEPENING/UNDER-RESEARCH), deepens flag, annotation notes
+  - Checkpoint/resume across reloads via IndexedDB (`src/services/localIntegrationService.ts`)
+  - Real PDF parsing via `pdfjs-dist` (`src/services/pdfParserService.ts`)
 - Reference system with APA 7 + Chicago, parallel ref lookup
 
 ### 🚀 In Progress / Next Up (from ROADMAP)
@@ -230,18 +232,17 @@ These are hard-won lessons from previous sessions. Do **not** repeat these mista
 
 ## 10. Fireside Integration Pipeline (most complex feature)
 
-**Location:** `src/app/admin/fireside-integration/page.tsx` + `src/services/firesideIntegrationService.ts`
+**Location:** `src/app/admin/fireside-integration/page.tsx` + `src/services/localIntegrationService.ts` + `src/lib/indexedDb.ts`
 
-**Workflow:**
-1. Admin uploads `guide.md` (defines PDF list + fireside transition table + LLM instructions)
-2. Admin uploads raw scanned PDFs
-3. Parse guide → create `IntegrationJob` in Firestore
-4. Process: pdf.js renders pages → DeepSeek extracts 30-50 word snippets → classify into 7 categories → Gemini Flash labels images → crop
-5. Checkpoint after each step (resume-safe)
-6. Review: expand categories, edit snippets, change statuses (IN-REVIEW → APPROVED/REJECTED/MERGED/DEEPENING/UNDER-RESEARCH)
-7. Approve → batch insert into Firestore
+**Architecture:** IndexedDB scratch space + Firestore for final atoms only. Intermediate parse state (raw PDF blobs, parsed snippets, job cursor) lives in IndexedDB; Firestore receives only the finalized `fireside` + `snippet`(+`deepening`) entities on approval.
 
-**Batch continuation:** `processedPdfs` tracks per-PDF status (`complete/partial/error/pending`). Completed PDFs skipped on next upload; error/partial PDFs can be "Redo" (cleans old data first via `cleanupPdfResults()`).
+**Workflow (one fireside at a time):**
+1. Admin uploads `guide.md` (defines PDF list + fireside transitions + LLM instructions) and the raw PDFs it references.
+2. Create job → stored entirely in IndexedDB (`integrationDb`).
+3. "Process This Fireside" — `pdfjs-dist` parses the current fireside's page range and groups text into 30–50 word snippets (`localIntegrationService.processCurrentFireside`).
+4. Preview + full CRUD: edit, delete/restore, status change, deepens flag, annotation notes — every action persists to IndexedDB.
+5. "Approve Fireside" — writes final atomized `fireside` + `snippet`(+`deepening`) into Firestore, then advances the cursor.
+6. Reload-safe: resume from the IndexedDB cursor; PDFs and progress persist in-browser.
 
 **guide.md format:**
 ```
@@ -256,7 +257,7 @@ These are hard-won lessons from previous sessions. Do **not** repeat these mista
 ...
 ```
 
-**Note:** There are TWO import pages — `/admin/integrate` (legacy, single PDF, manual) and `/admin/fireside-integration` (new, batch, guide.md-driven). New work should go into `fireside-integration`.
+**Note:** There are TWO import pages — `/admin/integrate` (legacy, single PDF, manual) and `/admin/fireside-integration` (new, guide.md-driven, one-fireside-at-a-time). New work should go into `fireside-integration`.
 
 ---
 
